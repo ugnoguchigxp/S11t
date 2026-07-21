@@ -1,0 +1,37 @@
+{
+  "name": "@s11t/runtime",
+  "version": "0.0.0",
+  "description": "Filesystem-independent runtime and compiler contracts for S11t",
+  "type": "module",
+  "types": "./dist/index.d.ts",
+  "license": "Apache-2.0",
+  "sideEffects": false,
+  "files": ["dist", "README.md", "LICENSE", "NOTICE", "SECURITY.md", "CONTRIBUTING.md", "CHANGELOG.md"],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./compiler": {
+      "types": "./dist/compiler.d.ts",
+      "import": "./dist/compiler.js"
+    }
+  },
+  "engines": {
+    "node": "^22.0.0 || ^24.0.0"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "scripts": {
+    "build": "tsc -b --pretty false",
+    "typecheck": "tsc -b --pretty false",
+    "test": "vitest run",
+    "test:no-node-builtins": "node ../../scripts/check-runtime-boundary.mjs",
+    "test:browser-bundle": "node ../../scripts/check-browser-bundle.mjs"
+  },
+  "dependencies": {
+    "@noble/hashes": "2.2.0"
+  }
+}

@@ -1,0 +1,89 @@
+import {
+	cpSync,
+	mkdtempSync,
+	readFileSync,
+	rmSync,
+	symlinkSync,
+	writeFileSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
+import { createCatalog } from "@s11t/runtime";
+import { afterEach, describe, expect, it } from "vitest";
+
+import { buildProject } from "../src/build-command.js";
+import { S11tDiagnosticError } from "../src/diagnostics.js";
+
+const temporaryDirectories: string[] = [];
+
+function temporaryFixture(name = "valid/multilingual"): string {
+	const directory = mkdtempSync(join(tmpdir(), "s11t-build-"));
+	temporaryDirectories.push(directory);
+	cpSync(new URL(`../../../fixtures/${name}`, import.meta.url), directory, { recursive: true });
+	return directory;
+}
+
+afterEach(() => {
+	for (const directory of temporaryDirectories.splice(0)) rmSync(directory, { recursive: true, force: true });
+});
+
+describe("build command", () => {
+	it("emits deterministic artifact and type bytes and passes --check", () => {
+		const directory = temporaryFixture();
+		const first = buildProject({ cwd: directory });
+		const firstJson = readFileSync(first.catalogPath, "utf8");
+		const firstTypes = readFileSync(first.typesPath, "utf8");
+		const second = buildProject({ cwd: directory });
+		expect(readFileSync(second.catalogPath, "utf8")).toBe(firstJson);
+		expect(readFileSync(second.typesPath, "utf8")).toBe(firstTypes);
+		expect(buildProject({ cwd: directory, check: true }).checked).toBe(true);
+		expect(() => createCatalog(JSON.parse(firstJson))).not.toThrow();
+		expect(firstJson).not.toContain(directory);
+		expect(firstTypes).toContain("export type SystemContextKey =");
+		expect(firstTypes).toContain('"name": string;');
+	});
+
+	it("detects stale output without rewriting it", () => {
+		const directory = temporaryFixture();
+		const result = buildProject({ cwd: directory });
+		const before = readFileSync(result.catalogPath, "utf8");
+		const sourcePath = join(directory, "contexts/greeting.context.toml");
+		writeFileSync(sourcePath, readFileSync(sourcePath, "utf8").replace("Bonjour", "Salut"));
+		expect(() => buildProject({ cwd: directory, check: true })).toThrowError(
+			expect.objectContaining<S11tDiagnosticError>({
+				diagnostics: [expect.objectContaining({ code: "S11T_BUILD_STALE" })],
+			}),
+		);
+		expect(readFileSync(result.catalogPath, "utf8")).toBe(before);
+	});
+
+	it("preserves previous successful outputs when validation fails", () => {
+		const directory = temporaryFixture();
+		const result = buildProject({ cwd: directory });
+		const beforeJson = readFileSync(result.catalogPath, "utf8");
+		const beforeTypes = readFileSync(result.typesPath, "utf8");
+		writeFileSync(join(directory, "contexts/broken.context.toml"), "schema_version = [");
+		expect(() => buildProject({ cwd: directory })).toThrow(S11tDiagnosticError);
+		expect(readFileSync(result.catalogPath, "utf8")).toBe(beforeJson);
+		expect(readFileSync(result.typesPath, "utf8")).toBe(beforeTypes);
+	});
+
+	it.skipIf(process.platform === "win32")("rejects out_dir symlinks outside the project", () => {
+		const directory = temporaryFixture("valid/simple");
+		const outside = mkdtempSync(join(tmpdir(), "s11t-build-outside-"));
+		temporaryDirectories.push(outside);
+		symlinkSync(outside, join(directory, "linked-output"), "dir");
+		const configPath = join(directory, "s11t.config.toml");
+		writeFileSync(
+			configPath,
+			readFileSync(configPath, "utf8").replace('out_dir = ".s11t"', 'out_dir = "linked-output"'),
+		);
+		expect(() => buildProject({ cwd: directory })).toThrowError(
+			expect.objectContaining<S11tDiagnosticError>({
+				diagnostics: [expect.objectContaining({ code: "S11T_CONFIG_INVALID" })],
+			}),
+		);
+		expect(() => readFileSync(join(outside, "catalog.json"), "utf8")).toThrow();
+	});
+});

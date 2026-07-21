@@ -1,0 +1,19 @@
+{
+  "name": "@s11t/example-node-basic",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": "^22.0.0 || ^24.0.0"
+  },
+  "scripts": {
+    "build": "s11t build && tsc -b --pretty false",
+    "start": "node dist/src/index.js"
+  },
+  "dependencies": {
+    "@s11t/runtime": "workspace:*"
+  },
+  "devDependencies": {
+    "@s11t/cli": "workspace:*"
+  }
+}

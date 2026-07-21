@@ -1,0 +1,10 @@
+schema_version = 1
+[context]
+id = "duplicate:context"
+version = "2.0.0"
+owner = "fixture"
+source_locale = "en-US"
+required_locales = ["en-US"]
+output = "text"
+[locales."en-US"]
+text = "Second"

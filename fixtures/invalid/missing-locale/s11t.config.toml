@@ -1,0 +1,5 @@
+schema_version = 1
+source_dir = "contexts"
+out_dir = ".s11t"
+required_locales = ["ja-JP", "en-US"]
+default_locale = "ja-JP"

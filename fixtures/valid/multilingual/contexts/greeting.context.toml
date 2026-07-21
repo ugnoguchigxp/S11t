@@ -1,0 +1,25 @@
+schema_version = 1
+
+[context]
+id = "example:greeting"
+version = "1.0.0"
+owner = "examples"
+source_locale = "ja-JP"
+required_locales = ["ja-JP", "en-US", "fr-FR"]
+output = "text"
+
+[variables.name]
+required = true
+type = "string"
+trust = "trusted"
+placement = "inline"
+encoding = "raw"
+
+[locales."ja-JP"]
+text = "こんにちは、[[name]]。"
+
+[locales."en-US"]
+text = "Hello, [[name]]."
+
+[locales."fr-FR"]
+text = "Bonjour, [[name]]."

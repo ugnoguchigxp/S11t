@@ -1,0 +1,74 @@
+export type JsonValue =
+	| null
+	| boolean
+	| number
+	| string
+	| JsonValue[]
+	| { [key: string]: JsonValue };
+
+export type TemplateSegment =
+	| { type: "literal"; value: string }
+	| { type: "variable"; name: string };
+
+export type S11tVariableType = "string" | "number" | "boolean" | "json";
+export type S11tVariableTrust = "trusted" | "untrusted";
+export type S11tVariablePlacement = "inline" | "delimited-context";
+export type S11tVariableEncoding = "raw" | "json-string" | "json-value";
+
+export type S11tCompiledVariableV1 = {
+	required: true;
+	type: S11tVariableType;
+	trust: S11tVariableTrust;
+	placement: S11tVariablePlacement;
+	encoding: S11tVariableEncoding;
+};
+
+export type S11tSectionKind =
+	| "instruction"
+	| "runtime-fact"
+	| "tool-contract"
+	| "output-contract"
+	| "overlay";
+
+export type S11tSectionSeverity = "must" | "should" | "may";
+export type S11tSectionEnforcement = "prompt" | "schema" | "host";
+
+export type S11tCompiledSectionV1 = {
+	id: string;
+	kind: S11tSectionKind;
+	severity: S11tSectionSeverity;
+	enforcement: S11tSectionEnforcement;
+	optimizable: boolean;
+	segments: TemplateSegment[];
+};
+
+export type S11tCompiledLocaleV1 = {
+	sections: S11tCompiledSectionV1[];
+	artifactHash: string;
+};
+
+export type S11tCompiledContextV1 = {
+	id: string;
+	version: string;
+	owner: string;
+	output: "text";
+	sourceLocale: string;
+	requiredLocales: string[];
+	variables: Record<string, S11tCompiledVariableV1>;
+	locales: Record<string, S11tCompiledLocaleV1>;
+	definitionHash: string;
+	releaseDigest: string;
+};
+
+export type S11tCatalogArtifactV1 = {
+	format: "s11t.catalog";
+	schemaVersion: 1;
+	compilerVersion: string;
+	defaultLocale: string;
+	createdFrom: {
+		configPath: string;
+		sourceFiles: string[];
+	};
+	contexts: Record<string, S11tCompiledContextV1>;
+	catalogDigest: string;
+};

@@ -1,0 +1,8 @@
+{
+  "canonical": "{\"a\":\"line break\",\"array\":[true,null,{\"a\":0,\"β\":\"日本語\"}],\"z\":1}",
+  "definitionHash": "sha256:193f6d6240bd74938d7d7b1961a949084bff7ff057036d21f30c25990d9eb87e",
+  "artifactHash": "sha256:cbfe133430d68640cb376f5c1e5df8a2e5d68f0c2675628ec1fe153c5fc785c0",
+  "releaseDigest": "sha256:21ca49f76189804461f76054469bd4ee003ed45697b30021085e898c7d55d36c",
+  "catalogDigest": "sha256:1d198fb2d0167e552a5db3120732e996469d01ea4bbd3f0e4a18e8e916f9a760",
+  "renderedHash": "sha256:1b87976d4291fe9d3bf0a95c1d064bad89c528e13a6a82434315859f182b95fc"
+}

@@ -1,0 +1,116 @@
+name: Release
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      channel:
+        description: Release channel
+        required: true
+        type: choice
+        options: [canary, stable]
+      ref:
+        description: Exact 40-character commit SHA to publish
+        required: true
+        type: string
+      confirm:
+        description: Type publish-canary or publish-stable
+        required: true
+        type: string
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  version-pr:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+      - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile --ignore-scripts
+      - uses: changesets/action@a45c4d594aa4e2c509dc14a9f2b3b67ba3780d0d # v1.9.0
+        with:
+          version: pnpm version-packages
+          title: Release packages
+          commit: Version packages
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  publish:
+    if: >-
+      github.event_name == 'workflow_dispatch' &&
+      ((inputs.channel == 'canary' && inputs.confirm == 'publish-canary') ||
+       (inputs.channel == 'stable' && inputs.confirm == 'publish-stable'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: ${{ inputs.channel == 'stable' && 'npm-stable' || 'npm-canary' }}
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ inputs.ref }}
+          fetch-depth: 0
+      - name: Validate immutable release ref
+        env:
+          RELEASE_CHANNEL: ${{ inputs.channel }}
+          RELEASE_REF: ${{ inputs.ref }}
+        run: |
+          [[ "$RELEASE_REF" =~ ^[0-9a-f]{40}$ ]]
+          CHECKED_SHA="$(git rev-parse HEAD)"
+          test "$CHECKED_SHA" = "$RELEASE_REF"
+          git fetch --no-tags origin main
+          MAIN_SHA="$(git rev-parse origin/main)"
+          git merge-base --is-ancestor "$CHECKED_SHA" "$MAIN_SHA"
+          if [ "$RELEASE_CHANNEL" = "stable" ]; then
+            test "$CHECKED_SHA" = "$MAIN_SHA"
+          fi
+      - name: Keep stable publishing disabled until Phase 6
+        if: inputs.channel == 'stable'
+        env:
+          S11T_STABLE_RELEASE_ENABLED: ${{ vars.S11T_STABLE_RELEASE_ENABLED }}
+        run: test "$S11T_STABLE_RELEASE_ENABLED" = "true"
+      - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+          package-manager-cache: false
+      - run: npm install --global npm@11.6.4 --ignore-scripts
+      - run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: Create canary snapshot version
+        if: inputs.channel == 'canary'
+        run: pnpm version:canary
+      - name: Verify release candidate
+        run: >-
+          pnpm release:dry-run -- --channel ${{ inputs.channel }}
+          ${{ inputs.channel == 'canary' && '--allow-snapshot-changes' || '' }}
+      - name: Publish canary with OIDC
+        if: inputs.channel == 'canary'
+        run: pnpm changeset publish --tag canary --no-git-tag
+      - name: Publish stable with OIDC
+        if: inputs.channel == 'stable'
+        run: pnpm changeset publish --no-git-tag
+      - run: node scripts/verify-registry-release.mjs
+      - name: Verify registry signatures and provenance
+        run: |
+          mkdir -p .artifacts/registry-consumer
+          cd .artifacts/registry-consumer
+          npm init --yes
+          DIST_TAG="${{ inputs.channel == 'canary' && 'canary' || 'latest' }}"
+          npm install "@s11t/runtime@$DIST_TAG" "@s11t/cli@$DIST_TAG"
+          npm audit signatures

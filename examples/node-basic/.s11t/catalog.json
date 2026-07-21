@@ -1,0 +1,117 @@
+{
+  "format": "s11t.catalog",
+  "schemaVersion": 1,
+  "compilerVersion": "0.0.0",
+  "defaultLocale": "ja-JP",
+  "createdFrom": {
+    "configPath": "s11t.config.toml",
+    "sourceFiles": [
+      "contexts/identity.context.toml"
+    ]
+  },
+  "contexts": {
+    "codingAgent:identity": {
+      "id": "codingAgent:identity",
+      "version": "1.0.0",
+      "owner": "coding-agent",
+      "output": "text",
+      "sourceLocale": "ja-JP",
+      "requiredLocales": [
+        "ja-JP",
+        "en-US"
+      ],
+      "variables": {
+        "taskGoal": {
+          "required": true,
+          "type": "string",
+          "trust": "untrusted",
+          "placement": "delimited-context",
+          "encoding": "json-string"
+        }
+      },
+      "locales": {
+        "en-US": {
+          "sections": [
+            {
+              "id": "role.identity",
+              "kind": "instruction",
+              "severity": "must",
+              "enforcement": "prompt",
+              "optimizable": false,
+              "segments": [
+                {
+                  "type": "literal",
+                  "value": "You are a Coding Agent that automates user tasks."
+                }
+              ]
+            },
+            {
+              "id": "task.goal-context",
+              "kind": "runtime-fact",
+              "severity": "should",
+              "enforcement": "prompt",
+              "optimizable": false,
+              "segments": [
+                {
+                  "type": "literal",
+                  "value": "<TASK_GOAL_JSON_STRING>\n"
+                },
+                {
+                  "type": "variable",
+                  "name": "taskGoal"
+                },
+                {
+                  "type": "literal",
+                  "value": "\n</TASK_GOAL_JSON_STRING>"
+                }
+              ]
+            }
+          ],
+          "artifactHash": "sha256:0bbc0f4824892414d8b4b0ab031f7bc8de78cd27927eb835d75ceabe79e9e18d"
+        },
+        "ja-JP": {
+          "sections": [
+            {
+              "id": "role.identity",
+              "kind": "instruction",
+              "severity": "must",
+              "enforcement": "prompt",
+              "optimizable": false,
+              "segments": [
+                {
+                  "type": "literal",
+                  "value": "あなたはユーザーTaskを自動化するCoding Agentです。"
+                }
+              ]
+            },
+            {
+              "id": "task.goal-context",
+              "kind": "runtime-fact",
+              "severity": "should",
+              "enforcement": "prompt",
+              "optimizable": false,
+              "segments": [
+                {
+                  "type": "literal",
+                  "value": "<TASK_GOAL_JSON_STRING>\n"
+                },
+                {
+                  "type": "variable",
+                  "name": "taskGoal"
+                },
+                {
+                  "type": "literal",
+                  "value": "\n</TASK_GOAL_JSON_STRING>"
+                }
+              ]
+            }
+          ],
+          "artifactHash": "sha256:97471e988d0782e690448ccd56cad662f032f1d8ed9d2c1b12af935722523da8"
+        }
+      },
+      "definitionHash": "sha256:a62e62bebc60514be4b6d393ff517b270d0e8d9ffcd24c4dd6986a2219388043",
+      "releaseDigest": "sha256:2beb4fa957720a4117f9c3181a4874cf9ded238886df2478852562e3f0775589"
+    }
+  },
+  "catalogDigest": "sha256:9beacfd1b67bc08ef77e7440001837a79b6c127d3013cc25a8a3fd1fb8e9992f"
+}

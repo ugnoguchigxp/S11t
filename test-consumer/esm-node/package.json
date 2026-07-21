@@ -1,0 +1,14 @@
+{
+  "name": "@s11t/test-consumer-esm-node",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "s11t build && tsc -p tsconfig.json --pretty false",
+    "start": "node dist/src/index.js"
+  },
+  "devDependencies": {
+    "@types/node": "26.1.1",
+    "typescript": "7.0.2"
+  }
+}

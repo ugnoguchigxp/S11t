@@ -1,0 +1,13 @@
+export { parseAuthoringDocument, validateAuthoringDocuments } from "./authoring-schema.js";
+export type { AuthoringDocument } from "./authoring-schema.js";
+export { parseProjectConfig } from "./config.js";
+export type { S11tProjectConfig } from "./config.js";
+export { buildProject } from "./build-command.js";
+export { compileProject } from "./compile-source.js";
+export { loadProject } from "./discover.js";
+export { emitTypes } from "./emit-types.js";
+export { inspectContext } from "./inspect-command.js";
+export { lintProject } from "./lint-command.js";
+export { runCli } from "./main.js";
+export { S11tDiagnosticError } from "./diagnostics.js";
+export type { S11tDiagnostic } from "./diagnostics.js";
