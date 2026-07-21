@@ -129,7 +129,7 @@ async function inspectPackage(entry) {
 		if (packageJson.name !== entry.name || packageJson.version !== entry.version) {
 			throw new Error(`${entry.name} packed manifest identity does not match package.json`);
 		}
-		const changelog = readFileSync(resolve(packageRoot, "CHANGELOG.md"), "utf8");
+		const changelog = readFileSync(resolve(packageRoot, "CHANGELOG.md"), "utf8").replaceAll("\r\n", "\n");
 		if (!changelog.includes(`## ${entry.version}\n`)) {
 			throw new Error(`${entry.name} changelog does not contain version ${entry.version}`);
 		}
