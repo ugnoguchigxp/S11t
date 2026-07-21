@@ -5,6 +5,15 @@
   "type": "module",
   "types": "./dist/index.d.ts",
   "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ugnoguchigxp/S11t.git",
+    "directory": "packages/cli"
+  },
+  "homepage": "https://github.com/ugnoguchigxp/S11t/tree/main/packages/cli#readme",
+  "bugs": {
+    "url": "https://github.com/ugnoguchigxp/S11t/issues"
+  },
   "files": ["bin", "dist", "README.md", "LICENSE", "NOTICE", "SECURITY.md", "CONTRIBUTING.md", "CHANGELOG.md"],
   "bin": {
     "s11t": "./bin/s11t.js"

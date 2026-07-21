@@ -4,6 +4,14 @@
   "private": true,
   "type": "module",
   "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ugnoguchigxp/S11t.git"
+  },
+  "homepage": "https://github.com/ugnoguchigxp/S11t#readme",
+  "bugs": {
+    "url": "https://github.com/ugnoguchigxp/S11t/issues"
+  },
   "packageManager": "pnpm@10.24.0",
   "engines": {
     "node": "^22.0.0 || ^24.0.0"
@@ -34,6 +42,7 @@
     "@s11t/cli": "workspace:*",
     "@types/node": "26.1.1",
     "ajv": "8.20.0",
+    "cross-spawn": "7.0.6",
     "esbuild": "0.28.1",
     "tar": "7.5.20",
     "typescript": "7.0.2",

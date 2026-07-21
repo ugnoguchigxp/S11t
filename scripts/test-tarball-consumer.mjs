@@ -1,8 +1,10 @@
 import { cpSync, existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
-import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import crossSpawn from "cross-spawn";
+
+const { sync: spawnSync } = crossSpawn;
 
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const fixtureRoot = resolve(repositoryRoot, "test-consumer/esm-node");

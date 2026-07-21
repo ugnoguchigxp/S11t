@@ -1,7 +1,9 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
-import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import crossSpawn from "cross-spawn";
+
+const { sync: spawnSync } = crossSpawn;
 
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const artifactDirectory = resolve(repositoryRoot, ".artifacts/packages");

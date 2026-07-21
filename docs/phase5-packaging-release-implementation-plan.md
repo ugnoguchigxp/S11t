@@ -14,7 +14,7 @@ Implementation status on 2026-07-21:
 - Snapshot version verification: `0.1.0-canary-<commit>`で成功。
 - Stable version verification: 一時Git repository上の`0.1.0`で、実tarball、content allowlist、隔離consumer、`release:dry-run --channel stable`まで成功。
 - Full review hardening: runtime決定性、path confinement、tarball checksum/export/version検証、immutable release SHA、Action SHA pin、OIDC jobのinstall script抑止、registry retryを実装。82 tests passed。
-- P5-00: GitHub repository metadataとnpm scope confirmationのみ未完了。
+- P5-00: public GitHub repository、origin、default branch、package metadataを確定。npm scope confirmationのみ未完了。
 - P5-07: external registry mutationのため未実施。
 
 ## 1. 目的

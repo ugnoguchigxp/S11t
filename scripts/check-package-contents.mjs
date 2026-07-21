@@ -19,6 +19,8 @@ const requiredRootFiles = [
 	"CHANGELOG.md",
 ];
 const expectedPackageNames = ["@s11t/runtime", "@s11t/cli"];
+const expectedRepositoryUrl = "git+https://github.com/ugnoguchigxp/S11t.git";
+const expectedBugsUrl = "https://github.com/ugnoguchigxp/S11t/issues";
 
 function filesUnder(root) {
 	const files = [];
@@ -132,6 +134,19 @@ async function inspectPackage(entry) {
 			throw new Error(`${entry.name} changelog does not contain version ${entry.version}`);
 		}
 		if (packageJson.license !== "Apache-2.0") throw new Error(`${entry.name} has no Apache-2.0 license metadata`);
+		if (
+			packageJson.repository?.type !== "git" ||
+			packageJson.repository?.url !== expectedRepositoryUrl ||
+			packageJson.repository?.directory !== `packages/${entry.name.slice("@s11t/".length)}`
+		) {
+			throw new Error(`${entry.name} has invalid repository metadata`);
+		}
+		if (!packageJson.homepage?.startsWith("https://github.com/ugnoguchigxp/S11t/")) {
+			throw new Error(`${entry.name} has invalid homepage metadata`);
+		}
+		if (packageJson.bugs?.url !== expectedBugsUrl) {
+			throw new Error(`${entry.name} has invalid bugs metadata`);
+		}
 		if (packageJson.types !== "./dist/index.d.ts") throw new Error(`${entry.name} has invalid types metadata`);
 		if (packageJson.engines?.node !== "^22.0.0 || ^24.0.0") {
 			throw new Error(`${entry.name} has unsupported Node.js engine metadata`);
