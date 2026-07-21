@@ -14,7 +14,7 @@
   },
   "packageManager": "pnpm@10.24.0",
   "engines": {
-    "node": "^22.0.0 || ^24.0.0"
+    "node": "^20.19.0 || ^22.0.0 || ^24.0.0"
   },
   "scripts": {
     "build": "tsc -b --pretty false",
@@ -35,6 +35,7 @@
     "test:consumer": "node scripts/test-tarball-consumer.mjs",
     "test:packages": "pnpm pack:all && pnpm test:package-contents && pnpm test:consumer",
     "release:dry-run": "node scripts/release-dry-run.mjs",
+    "deploy:nightworkers-canary": "node scripts/deploy-nightworkers-canary.mjs",
     "verify": "pnpm check:versions && pnpm typecheck && pnpm test && pnpm build && pnpm test:type-fixtures && pnpm test:no-node-builtins && pnpm test:browser-bundle && pnpm exec s11t --help"
   },
   "devDependencies": {

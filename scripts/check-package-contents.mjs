@@ -148,7 +148,7 @@ async function inspectPackage(entry) {
 			throw new Error(`${entry.name} has invalid bugs metadata`);
 		}
 		if (packageJson.types !== "./dist/index.d.ts") throw new Error(`${entry.name} has invalid types metadata`);
-		if (packageJson.engines?.node !== "^22.0.0 || ^24.0.0") {
+		if (packageJson.engines?.node !== "^20.19.0 || ^22.0.0 || ^24.0.0") {
 			throw new Error(`${entry.name} has unsupported Node.js engine metadata`);
 		}
 		if (packageJson.private === true) throw new Error(`${entry.name} is marked private`);

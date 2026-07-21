@@ -6,7 +6,8 @@ The v0.1 implementation is under active development. Authors edit TOML sources, 
 
 ## Development
 
-Requirements: Node.js 22 or 24 and Corepack-enabled pnpm.
+Requirements: Node.js 20.19 or newer in the Node 20 line, Node.js 22, or Node.js 24,
+plus Corepack-enabled pnpm.
 
 ```sh
 pnpm install --frozen-lockfile
@@ -20,6 +21,13 @@ pnpm test:packages
 contents, and installs them into an isolated ESM consumer. Release candidates
 add `pnpm release:dry-run -- --channel canary` after a Git remote and package
 repository metadata have been configured.
+
+To dogfood a canary in a sibling NightWorkers checkout without publishing it to
+npm, run `pnpm deploy:nightworkers-canary`. The command builds and validates a
+snapshot from the committed S11t `HEAD`, then updates NightWorkers' vendored
+tarballs, `package.json`, and `bun.lock` with automatic rollback on failure. Pass
+`--target /path/to/nightWorkers` for a non-sibling checkout and `--verify` to
+also run NightWorkers' full typecheck and build.
 
 ## Project boundary
 

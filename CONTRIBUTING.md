@@ -1,6 +1,6 @@
 # Contributing
 
-Use Node.js 22 or 24 and the pnpm version pinned in `package.json`.
+Use Node.js 20.19+, 22, or 24 and the pnpm version pinned in `package.json`.
 
 Before submitting a change, run:
 
