@@ -1,4 +1,5 @@
-import { assertCatalogArtifactV1 } from "./artifact-schema.js";
+import { assertCatalogArtifactV1, isCatalogArtifactV2 } from "./artifact-schema.js";
+import { createCatalogV2 } from "./catalog-v2.js";
 import type { CanonicalContextDefinition, CanonicalSectionDefinition } from "./canonical-definition.js";
 import { S11tError } from "./diagnostics.js";
 import { encodeValue } from "./encoding.js";
@@ -400,6 +401,9 @@ export function createCatalog<C extends DefaultContract = DefaultContract>(
 	input: unknown,
 	options: { expectedCatalogDigest?: string } = {},
 ): Catalog<C> {
+	if (isCatalogArtifactV2(input)) {
+		return createCatalogV2<C>(input, options) as unknown as Catalog<C>;
+	}
 	assertCatalogArtifactV1(input);
 	assertCatalogIntegrityV1(input);
 	if (

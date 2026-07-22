@@ -1,0 +1,4 @@
+text = '''Task: [[taskGoal]]'''
+
+[variables.taskGoal]
+profile = "trusted.inline"

@@ -1,12 +1,16 @@
 import { S11tDiagnosticError, type S11tDiagnostic } from "./diagnostics.js";
+import { parseProjectConfigV2, type S11tProjectConfigV2 } from "./config-v2.js";
 
-export type S11tProjectConfig = {
+export type S11tProjectConfigV1 = {
 	schemaVersion: 1;
 	sourceDir: string;
 	outDir: string;
 	requiredLocales: string[];
 	defaultLocale: string;
 };
+
+export type S11tProjectConfig = S11tProjectConfigV1 | S11tProjectConfigV2;
+export type { S11tProjectConfigV2 } from "./config-v2.js";
 
 const LOCALE_PATTERN = /^[A-Za-z]{2,8}(?:-[A-Za-z0-9]{1,8})*$/;
 
@@ -81,6 +85,7 @@ function localeArray(value: unknown, file: string, path: Array<string | number>)
 
 export function parseProjectConfig(input: unknown, file = "s11t.config.toml"): S11tProjectConfig {
 	const source = object(input, file, []);
+	if (source.schema_version === 2) return parseProjectConfigV2(source, file);
 	const allowed = new Set([
 		"schema_version",
 		"source_dir",

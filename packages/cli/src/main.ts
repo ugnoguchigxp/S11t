@@ -2,13 +2,15 @@ import { buildProject } from "./build-command.js";
 import { S11tDiagnosticError, type S11tDiagnostic } from "./diagnostics.js";
 import { inspectContext } from "./inspect-command.js";
 import { lintProject } from "./lint-command.js";
+import { migrateAuthoringV2 } from "./migrate-command.js";
 
 export const HELP = `s11t - SystemContext authoring and build tools
 
 Usage:
-  s11t lint [--config s11t.config.toml] [--format human|json]
-  s11t build [--config s11t.config.toml] [--check] [--format human|json]
-  s11t inspect <namespace:key> [--locale ja-JP] [--config s11t.config.toml]
+  s11t lint [--config s11t.config.toml] [--release-profile name] [--format human|json]
+  s11t build [--config s11t.config.toml] [--release-profile name] [--check] [--format human|json]
+  s11t inspect <key> [--resolved] [--locale ja-JP] [--release-profile name] [--config s11t.config.toml]
+  s11t migrate authoring-v2 [--write] [--config s11t.config.toml] [--format human|json]
   s11t --help
 `;
 
@@ -66,9 +68,10 @@ export function runCli(
 			throw new CliUsageError("--format must be human or json");
 		}
 		const config = takeOption(arguments_, "--config");
+		const releaseProfile = takeOption(arguments_, "--release-profile");
 		if (command === "lint") {
 			if (arguments_.length > 0) throw new CliUsageError(`Unknown argument: ${arguments_[0]}`);
-			const result = lintProject(config, io.cwd);
+			const result = lintProject(config, io.cwd, releaseProfile);
 			io.stdout(
 				format === "json"
 					? `${JSON.stringify({ ok: true, ...result })}\n`
@@ -81,6 +84,7 @@ export function runCli(
 			if (arguments_.length > 0) throw new CliUsageError(`Unknown argument: ${arguments_[0]}`);
 			const result = buildProject({
 				...(config === undefined ? {} : { config }),
+				...(releaseProfile === undefined ? {} : { releaseProfile }),
 				check,
 				cwd: io.cwd,
 			});
@@ -95,19 +99,40 @@ export function runCli(
 		}
 		if (command === "inspect") {
 			const locale = takeOption(arguments_, "--locale");
+			const resolved = takeFlag(arguments_, "--resolved");
 			const key = arguments_.shift();
-			if (key === undefined) throw new CliUsageError("inspect requires a namespace:key argument");
+			if (key === undefined) throw new CliUsageError("inspect requires a context key");
 			if (arguments_.length > 0) throw new CliUsageError(`Unknown argument: ${arguments_[0]}`);
 			io.stdout(
 				`${JSON.stringify(
 					inspectContext(key, {
 						...(config === undefined ? {} : { config }),
 						...(locale === undefined ? {} : { locale }),
+						...(releaseProfile === undefined ? {} : { releaseProfile }),
+						resolved,
 						cwd: io.cwd,
 					}),
 					null,
 					2,
 				)}\n`,
+			);
+			return 0;
+		}
+		if (command === "migrate") {
+			const target = arguments_.shift();
+			if (target !== "authoring-v2") throw new CliUsageError("migrate requires authoring-v2");
+			const write = takeFlag(arguments_, "--write");
+			if (releaseProfile !== undefined) throw new CliUsageError("migrate does not accept --release-profile");
+			if (arguments_.length > 0) throw new CliUsageError(`Unknown argument: ${arguments_[0]}`);
+			const result = migrateAuthoringV2({
+				...(config === undefined ? {} : { config }),
+				cwd: io.cwd,
+				write,
+			});
+			io.stdout(
+				format === "json"
+					? `${JSON.stringify({ ok: true, ...result })}\n`
+					: `${write ? "Migrated" : "Would migrate"} ${result.contexts} context(s), ${result.profiles} profile(s), and ${result.aliases} alias(es).\n`,
 			);
 			return 0;
 		}

@@ -35,7 +35,11 @@ also run NightWorkers' full typecheck and build.
 - `@s11t/cli` owns filesystem access, TOML parsing, validation, and file emission.
 - LLM calls, authorization, persistence, and provider adapters belong to the host application.
 
-The current v1 contracts are documented under [`docs/specification`](./docs/specification), with public schemas under [`schemas`](./schemas).
+The v1 compatibility contracts and the content-first v2 contracts are documented under
+[`docs/specification`](./docs/specification), with public schemas under [`schemas`](./schemas).
+
+The [content-first authoring and locale resolution implementation plan](./docs/proposals/content-first-authoring-and-locale-resolution.md)
+describes the v2 design, dot-key migration, NightWorkers canary, and rollout gates.
 
 See the [getting started guide](./docs/guides/getting-started.md) and the runnable [`examples/node-basic`](./examples/node-basic) project for the complete TOML-to-`p()` flow.
 

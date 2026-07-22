@@ -2,7 +2,7 @@ import { randomBytes } from "node:crypto";
 import { mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { basename, resolve } from "node:path";
 
-import { assertCatalogArtifactV1 } from "@s11t/runtime";
+import { assertCatalogArtifactV1, assertCatalogArtifactV2 } from "@s11t/runtime";
 
 import { compileProject } from "./compile-source.js";
 import { S11tDiagnosticError, type S11tDiagnostic } from "./diagnostics.js";
@@ -46,11 +46,13 @@ function atomicWrite(path: string, content: string): void {
 }
 
 export function buildProject(
-	options: { config?: string; check?: boolean; cwd?: string } = {},
+	options: { config?: string; check?: boolean; cwd?: string; releaseProfile?: string } = {},
 ): BuildResult {
-	const project = compileProject(options.config, options.cwd);
+	const project = compileProject(options.config, options.cwd, options.releaseProfile);
 	const catalogBytes = `${JSON.stringify(project.artifact, null, 2)}\n`;
-	assertCatalogArtifactV1(JSON.parse(catalogBytes));
+	const parsedArtifact: unknown = JSON.parse(catalogBytes);
+	if (project.artifact.schemaVersion === 1) assertCatalogArtifactV1(parsedArtifact);
+	else assertCatalogArtifactV2(parsedArtifact);
 	const typeBytes = emitTypes(project.artifact);
 	const outputDirectory = resolve(project.configDirectory, project.config.outDir);
 	const catalogPath = resolve(outputDirectory, "catalog.json");

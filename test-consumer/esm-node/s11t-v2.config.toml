@@ -1,0 +1,23 @@
+schema_version = 2
+authoring_version = 2
+artifact_version = 2
+source_dir = "contexts-v2"
+out_dir = ".s11t-v2"
+
+[authoring]
+source_locale = "ja-JP"
+
+[governance]
+require_owner = true
+
+[keyspaces.consumer]
+owner = "consumer"
+
+[release_profiles.development]
+required_locales = ["$source"]
+
+[variable_profiles."trusted.inline"]
+type = "string"
+trust = "trusted"
+placement = "inline"
+encoding = "raw"

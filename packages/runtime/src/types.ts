@@ -72,3 +72,34 @@ export type S11tCatalogArtifactV1 = {
 	contexts: Record<string, S11tCompiledContextV1>;
 	catalogDigest: string;
 };
+
+export type S11tCompiledVariableV2 = S11tCompiledVariableV1;
+export type S11tCompiledSectionV2 = S11tCompiledSectionV1;
+export type S11tCompiledLocaleV2 = S11tCompiledLocaleV1;
+
+export type S11tCompiledContextV2 = {
+	key: string;
+	owner: string;
+	contentKind: "text";
+	sourceLocale: string;
+	requiredLocales: string[];
+	variables: Record<string, S11tCompiledVariableV2>;
+	locales: Record<string, S11tCompiledLocaleV2>;
+	definitionHash: string;
+	releaseDigest: string;
+};
+
+export type S11tCatalogArtifactV2 = {
+	format: "s11t.catalog";
+	schemaVersion: 2;
+	compilerVersion: string;
+	releaseProfile: string;
+	policyDigest: string;
+	createdFrom: {
+		configPath: string;
+		sourceFiles: string[];
+	};
+	contexts: Record<string, S11tCompiledContextV2>;
+	aliases: Record<string, string>;
+	catalogDigest: string;
+};

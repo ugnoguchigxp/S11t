@@ -74,6 +74,9 @@ try {
 	run(npm, ["exec", "--", "s11t", "lint"]);
 	run(npm, ["exec", "--", "s11t", "build"]);
 	run(npm, ["exec", "--", "s11t", "build", "--check"]);
+	run(npm, ["exec", "--", "s11t", "lint", "--config", "s11t-v2.config.toml", "--release-profile", "development"]);
+	run(npm, ["exec", "--", "s11t", "build", "--config", "s11t-v2.config.toml", "--release-profile", "development"]);
+	run(npm, ["exec", "--", "s11t", "build", "--check", "--config", "s11t-v2.config.toml", "--release-profile", "development"]);
 	run(npm, ["exec", "--", "tsc", "-p", "tsconfig.json", "--pretty", "false"]);
 	const output = run(node, ["dist/src/index.js"]);
 	const result = JSON.parse(output);
@@ -81,6 +84,19 @@ try {
 	if (invocation.key !== "consumer:identity") throw new Error("Consumer returned the wrong key");
 	if (!invocation.content?.text?.includes("tarballを検証する")) {
 		throw new Error("Consumer did not render the runtime value");
+	}
+	if (
+		result.invocationV2?.key !== "consumer.identity" ||
+		!result.invocationV2?.content?.text?.includes("tarballを検証する")
+	) {
+		throw new Error("Consumer did not render the artifact v2 runtime value");
+	}
+	if (
+		!result.textV2?.includes("tarballを検証する") ||
+		result.statusTextV2 !== "Ready\n" ||
+		result.liveStatusTextV2 !== "Ready\n"
+	) {
+		throw new Error("Consumer did not render the artifact v2 text adapters");
 	}
 	const expectedVersion = manifest.packages[0]?.version;
 	if (invocation.manifest?.compilerVersion !== expectedVersion) {

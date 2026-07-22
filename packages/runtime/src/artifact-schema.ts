@@ -1,10 +1,12 @@
 import { S11tError } from "./diagnostics.js";
-import type { S11tCatalogArtifactV1 } from "./types.js";
+import type { S11tCatalogArtifactV1, S11tCatalogArtifactV2 } from "./types.js";
 
 type Path = Array<string | number>;
 type UnknownRecord = Record<string, unknown>;
 
 const DIGEST_PATTERN = /^sha256:[0-9a-f]{64}$/;
+const LOCALE_PATTERN = /^[A-Za-z]{2,8}(?:-[A-Za-z0-9]{1,8})*$/;
+const VARIABLE_NAME_PATTERN = /^[A-Za-z][A-Za-z0-9_]*$/;
 
 function fail(path: Path, expected: string): never {
 	throw new S11tError(
@@ -136,7 +138,7 @@ function validateVariable(value: unknown, path: Path): void {
 	}
 }
 
-function validateSegment(value: unknown, path: Path): void {
+function validateSegment(value: unknown, path: Path, validateVariableName = false): void {
 	const object = record(value, path);
 	const type = oneOf(object.type, ["literal", "variable"], [...path, "type"]);
 	if (type === "literal") {
@@ -145,10 +147,13 @@ function validateSegment(value: unknown, path: Path): void {
 		return;
 	}
 	exactKeys(object, ["type", "name"], path);
-	nonEmptyString(object.name, [...path, "name"]);
+	const name = nonEmptyString(object.name, [...path, "name"]);
+	if (validateVariableName && !VARIABLE_NAME_PATTERN.test(name)) {
+		fail([...path, "name"], "a variable name");
+	}
 }
 
-function validateSection(value: unknown, path: Path): void {
+function validateSection(value: unknown, path: Path, validateVariableNames = false): void {
 	const object = record(value, path);
 	exactKeys(
 		object,
@@ -165,16 +170,18 @@ function validateSection(value: unknown, path: Path): void {
 	oneOf(object.enforcement, ["prompt", "schema", "host"], [...path, "enforcement"]);
 	if (typeof object.optimizable !== "boolean") fail([...path, "optimizable"], "a boolean");
 	array(object.segments, [...path, "segments"]).forEach((segment, index) =>
-		validateSegment(segment, [...path, "segments", index]),
+		validateSegment(segment, [...path, "segments", index], validateVariableNames),
 	);
 }
 
-function validateLocale(value: unknown, path: Path): void {
+function validateLocale(value: unknown, path: Path, validateVariableNames = false): void {
 	const object = record(value, path);
 	exactKeys(object, ["sections", "artifactHash"], path);
 	const sections = array(object.sections, [...path, "sections"]);
 	if (sections.length === 0) fail([...path, "sections"], "a non-empty array");
-	sections.forEach((section, index) => validateSection(section, [...path, "sections", index]));
+	sections.forEach((section, index) =>
+		validateSection(section, [...path, "sections", index], validateVariableNames),
+	);
 	digest(object.artifactHash, [...path, "artifactHash"]);
 }
 
@@ -251,6 +258,110 @@ export function assertCatalogArtifactV1(value: unknown): asserts value is S11tCa
 export function isCatalogArtifactV1(value: unknown): value is S11tCatalogArtifactV1 {
 	try {
 		assertCatalogArtifactV1(value);
+		return true;
+	} catch (error) {
+		if (error instanceof S11tError) return false;
+		throw error;
+	}
+}
+
+const DOT_KEY_PATTERN = /^[A-Za-z][A-Za-z0-9_-]*(?:\.[A-Za-z][A-Za-z0-9_-]*)*$/;
+const ALIAS_KEY_PATTERN = /^(?:[A-Za-z][A-Za-z0-9_-]*(?:\.[A-Za-z][A-Za-z0-9_-]*)*|[A-Za-z][A-Za-z0-9_-]*:[A-Za-z][A-Za-z0-9_.-]*)$/;
+
+function validateContextV2(value: unknown, path: Path): void {
+	const object = record(value, path);
+	exactKeys(
+		object,
+		[
+			"key",
+			"owner",
+			"contentKind",
+			"sourceLocale",
+			"requiredLocales",
+			"variables",
+			"locales",
+			"definitionHash",
+			"releaseDigest",
+		],
+		path,
+	);
+	const key = nonEmptyString(object.key, [...path, "key"]);
+	if (!DOT_KEY_PATTERN.test(key)) fail([...path, "key"], "a dot context key");
+	nonEmptyString(object.owner, [...path, "owner"]);
+	literal(object.contentKind, "text", [...path, "contentKind"]);
+	const sourceLocale = nonEmptyString(object.sourceLocale, [...path, "sourceLocale"]);
+	if (!LOCALE_PATTERN.test(sourceLocale)) fail([...path, "sourceLocale"], "a locale identifier");
+	const requiredLocales = nonEmptyUniqueStringArray(
+		object.requiredLocales,
+		[...path, "requiredLocales"],
+	);
+	for (const [index, locale] of requiredLocales.entries()) {
+		if (!LOCALE_PATTERN.test(locale)) {
+			fail([...path, "requiredLocales", index], "a locale identifier");
+		}
+	}
+	const variables = record(object.variables, [...path, "variables"]);
+	for (const [name, variable] of Object.entries(variables)) {
+		if (!VARIABLE_NAME_PATTERN.test(name)) {
+			fail([...path, "variables", name], "a variable name");
+		}
+		validateVariable(variable, [...path, "variables", name]);
+	}
+	const locales = record(object.locales, [...path, "locales"]);
+	if (Object.keys(locales).length === 0) fail([...path, "locales"], "a non-empty object");
+	for (const [locale, definition] of Object.entries(locales)) {
+		if (!LOCALE_PATTERN.test(locale)) fail([...path, "locales", locale], "a locale identifier");
+		validateLocale(definition, [...path, "locales", locale], true);
+	}
+	digest(object.definitionHash, [...path, "definitionHash"]);
+	digest(object.releaseDigest, [...path, "releaseDigest"]);
+}
+
+export function assertCatalogArtifactV2(value: unknown): asserts value is S11tCatalogArtifactV2 {
+	const object = record(value, []);
+	exactKeys(
+		object,
+		[
+			"format",
+			"schemaVersion",
+			"compilerVersion",
+			"releaseProfile",
+			"policyDigest",
+			"createdFrom",
+			"contexts",
+			"aliases",
+			"catalogDigest",
+		],
+		[],
+	);
+	literal(object.format, "s11t.catalog", ["format"]);
+	literal(object.schemaVersion, 2, ["schemaVersion"]);
+	nonEmptyString(object.compilerVersion, ["compilerVersion"]);
+	nonEmptyString(object.releaseProfile, ["releaseProfile"]);
+	digest(object.policyDigest, ["policyDigest"]);
+	const createdFrom = record(object.createdFrom, ["createdFrom"]);
+	exactKeys(createdFrom, ["configPath", "sourceFiles"], ["createdFrom"]);
+	relativePosixPath(createdFrom.configPath, ["createdFrom", "configPath"]);
+	stringArray(createdFrom.sourceFiles, ["createdFrom", "sourceFiles"]).forEach(
+		(sourceFile, index) => relativePosixPath(sourceFile, ["createdFrom", "sourceFiles", index]),
+	);
+	const contexts = record(object.contexts, ["contexts"]);
+	for (const [key, context] of Object.entries(contexts)) {
+		if (!DOT_KEY_PATTERN.test(key)) fail(["contexts", key], "a dot context key");
+		validateContextV2(context, ["contexts", key]);
+	}
+	const aliases = record(object.aliases, ["aliases"]);
+	for (const [alias, target] of Object.entries(aliases)) {
+		if (!ALIAS_KEY_PATTERN.test(alias)) fail(["aliases", alias], "a dot or legacy context key");
+		const canonical = nonEmptyString(target, ["aliases", alias]);
+		if (!DOT_KEY_PATTERN.test(canonical)) fail(["aliases", alias], "a canonical dot context key target");
+	}
+	digest(object.catalogDigest, ["catalogDigest"]);
+}
+
+export function isCatalogArtifactV2(value: unknown): value is S11tCatalogArtifactV2 {
+	try {
+		assertCatalogArtifactV2(value);
 		return true;
 	} catch (error) {
 		if (error instanceof S11tError) return false;

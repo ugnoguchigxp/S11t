@@ -1,0 +1,104 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://s11t.dev/schemas/s11t-authoring-v2.schema.json",
+  "title": "S11t content-first TOML authoring document v2",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "key": { "$ref": "#/$defs/dotKey" },
+    "content_kind": { "const": "text" },
+    "text": { "type": "string", "minLength": 1 },
+    "translations": { "$ref": "#/$defs/translations" },
+    "variables": {
+      "type": "object",
+      "propertyNames": { "pattern": "^[A-Za-z][A-Za-z0-9_]*$" },
+      "additionalProperties": { "$ref": "#/$defs/variable" }
+    },
+    "sections": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/section" }
+    }
+  },
+  "oneOf": [
+    {
+      "required": ["text"],
+      "properties": { "text": {}, "sections": false }
+    },
+    {
+      "required": ["sections"],
+      "properties": { "sections": {}, "text": false, "translations": false }
+    }
+  ],
+  "$defs": {
+    "dotKey": {
+      "type": "string",
+      "pattern": "^[A-Za-z][A-Za-z0-9_-]*(?:\\.[A-Za-z][A-Za-z0-9_-]*)*$"
+    },
+    "translation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["text"],
+      "properties": { "text": { "type": "string", "minLength": 1 } }
+    },
+    "translations": {
+      "type": "object",
+      "propertyNames": { "pattern": "^[A-Za-z]{2,8}(?:-[A-Za-z0-9]{1,8})*$" },
+      "additionalProperties": { "$ref": "#/$defs/translation" }
+    },
+    "variable": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["profile"],
+          "properties": { "profile": { "type": "string", "minLength": 1 } }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type", "trust", "placement", "encoding"],
+          "properties": {
+            "type": { "enum": ["string", "number", "boolean", "json"] },
+            "trust": { "enum": ["trusted", "untrusted"] },
+            "placement": { "enum": ["inline", "delimited-context"] },
+            "encoding": { "enum": ["raw", "json-string", "json-value"] }
+          },
+          "allOf": [
+            {
+              "not": {
+                "required": ["trust", "encoding"],
+                "properties": {
+                  "trust": { "const": "untrusted" },
+                  "encoding": { "const": "raw" }
+                }
+              }
+            },
+            {
+              "if": { "properties": { "encoding": { "const": "raw" } }, "required": ["encoding"] },
+              "then": { "properties": { "type": { "const": "string" } }, "required": ["type"] }
+            },
+            {
+              "if": { "properties": { "encoding": { "const": "json-string" } }, "required": ["encoding"] },
+              "then": { "properties": { "type": { "enum": ["string", "number", "boolean"] } }, "required": ["type"] }
+            }
+          ]
+        }
+      ]
+    },
+    "section": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "kind", "severity", "enforcement", "optimizable", "text"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "kind": { "enum": ["instruction", "runtime-fact", "tool-contract", "output-contract", "overlay"] },
+        "severity": { "enum": ["must", "should", "may"] },
+        "enforcement": { "enum": ["prompt", "schema", "host"] },
+        "optimizable": { "type": "boolean" },
+        "text": { "type": "string", "minLength": 1 },
+        "translations": { "$ref": "#/$defs/translations" }
+      }
+    }
+  }
+}

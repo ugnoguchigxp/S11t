@@ -9,5 +9,5 @@
     "skipLibCheck": true,
     "types": ["node"]
   },
-  "include": ["src/**/*.ts", ".s11t/catalog.generated.ts"]
+	"include": ["src/**/*.ts", ".s11t/catalog.generated.ts", ".s11t-v2/catalog.generated.ts"]
 }

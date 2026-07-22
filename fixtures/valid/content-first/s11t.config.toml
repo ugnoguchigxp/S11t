@@ -1,0 +1,29 @@
+schema_version = 2
+authoring_version = 2
+artifact_version = 2
+source_dir = "contexts"
+out_dir = ".s11t"
+
+[authoring]
+source_locale = "ja-JP"
+
+[governance]
+require_owner = true
+
+[keyspaces.structuredGeneration]
+owner = "structured-generation"
+
+[release_profiles.development]
+required_locales = ["$source"]
+
+[release_profiles.production]
+required_locales = ["ja-JP", "en-US"]
+
+[variable_profiles."trusted.block"]
+type = "string"
+trust = "trusted"
+placement = "delimited-context"
+encoding = "raw"
+
+[key_aliases]
+"structuredGeneration:repair" = "structuredGeneration.repair"

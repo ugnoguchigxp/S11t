@@ -1,41 +1,34 @@
-import { assertCatalogArtifactV1 } from "./artifact-schema.js";
-import { assertCatalogIntegrityV1 } from "./catalog.js";
 import type {
-	CanonicalContextDefinition,
-	CanonicalSectionDefinition,
-} from "./canonical-definition.js";
+	CanonicalContextDefinitionV2,
+	CanonicalSectionDefinitionV2,
+} from "./canonical-definition-v2.js";
 import { normalizeNewlines } from "./canonical-definition.js";
 import {
-	hashArtifact,
-	hashCatalog,
-	hashDefinition,
-	hashRelease,
-} from "./hash.js";
+	hashArtifactV2,
+	hashCatalogV2,
+	hashDefinitionV2,
+	hashPolicyV2,
+	hashReleaseV2,
+} from "./hash-v2.js";
 import type {
-	S11tCatalogArtifactV1,
-	S11tCompiledContextV1,
-	S11tCompiledSectionV1,
+	S11tCatalogArtifactV2,
+	S11tCompiledContextV2,
+	S11tCompiledSectionV2,
 	TemplateSegment,
 } from "./types.js";
 import { COMPILER_VERSION } from "./version.js";
+import { assertCatalogArtifactV2 } from "./artifact-schema.js";
+import { assertCatalogIntegrityV2 } from "./catalog-v2.js";
 
-export type {
-	CanonicalContextDefinition,
-	CanonicalSectionDefinition,
-	CanonicalVariableDefinition,
-} from "./canonical-definition.js";
-
-export { COMPILER_VERSION } from "./version.js";
-export { compileCatalogV2 } from "./compiler-v2.js";
 export type {
 	CanonicalContextDefinitionV2,
 	CanonicalSectionDefinitionV2,
 	CanonicalVariableDefinitionV2,
-	CompileCatalogV2Options,
-} from "./compiler-v2.js";
+} from "./canonical-definition-v2.js";
 
-export type CompileCatalogOptions = {
-	defaultLocale: string;
+export type CompileCatalogV2Options = {
+	releaseProfile: string;
+	aliases?: Record<string, string>;
 	provenance: {
 		configPath: string;
 		sourceFiles: string[];
@@ -48,11 +41,11 @@ function compareCodeUnits(left: string, right: string): number {
 	return left < right ? -1 : left > right ? 1 : 0;
 }
 
-export function normalizeSectionText(text: string): string {
+function normalizeSectionText(text: string): string {
 	return normalizeNewlines(text).replace(/\n+$/g, "");
 }
 
-export function tokenizeTemplate(text: string): TemplateSegment[] {
+function tokenizeTemplate(text: string): TemplateSegment[] {
 	const segments: TemplateSegment[] = [];
 	let offset = 0;
 	for (const match of text.matchAll(PLACEHOLDER_PATTERN)) {
@@ -67,12 +60,13 @@ export function tokenizeTemplate(text: string): TemplateSegment[] {
 	return segments;
 }
 
-function normalizedDefinition(definition: CanonicalContextDefinition): CanonicalContextDefinition {
+function normalizedDefinition(
+	definition: CanonicalContextDefinitionV2,
+): CanonicalContextDefinitionV2 {
 	return {
-		id: definition.id,
-		version: definition.version,
+		key: definition.key,
 		owner: definition.owner,
-		output: definition.output,
+		contentKind: "text",
 		sourceLocale: definition.sourceLocale,
 		requiredLocales: [...definition.requiredLocales],
 		variables: Object.fromEntries(
@@ -105,9 +99,9 @@ function normalizedDefinition(definition: CanonicalContextDefinition): Canonical
 }
 
 function compileSections(
-	sections: CanonicalSectionDefinition[],
+	sections: CanonicalSectionDefinitionV2[],
 	locale: string,
-): S11tCompiledSectionV1[] {
+): S11tCompiledSectionV2[] {
 	return sections.map((section) => {
 		const text = section.locales[locale];
 		if (text === undefined) throw new TypeError(`Missing locale ${locale} in section ${section.id}`);
@@ -122,35 +116,31 @@ function compileSections(
 	});
 }
 
-function compileContext(definitionInput: CanonicalContextDefinition): S11tCompiledContextV1 {
+function compileContext(definitionInput: CanonicalContextDefinitionV2): S11tCompiledContextV2 {
 	const definition = normalizedDefinition(definitionInput);
-	const definitionHash = hashDefinition(definition);
+	const definitionHash = hashDefinitionV2(definition);
 	const artifactHashes: Record<string, string> = {};
 	const availableLocales = [
 		...new Set(definition.sections.flatMap((section) => Object.keys(section.locales))),
 	].sort(compareCodeUnits);
 	const locales = Object.fromEntries(
-		availableLocales
-			.map((locale) => {
-				const sections = compileSections(definition.sections, locale);
-				const artifactHash = hashArtifact({ id: definition.id, locale, sections });
-				artifactHashes[locale] = artifactHash;
-				return [locale, { sections, artifactHash }];
-			}),
+		availableLocales.map((locale) => {
+			const sections = compileSections(definition.sections, locale);
+			const artifactHash = hashArtifactV2({ key: definition.key, locale, sections });
+			artifactHashes[locale] = artifactHash;
+			return [locale, { sections, artifactHash }];
+		}),
 	);
-	const releaseDigest = hashRelease({
-		id: definition.id,
-		version: definition.version,
-		schemaVersion: 1,
+	const releaseDigest = hashReleaseV2({
+		key: definition.key,
 		compilerVersion: COMPILER_VERSION,
 		definitionHash,
 		artifactHashes,
 	});
 	return {
-		id: definition.id,
-		version: definition.version,
+		key: definition.key,
 		owner: definition.owner,
-		output: "text",
+		contentKind: "text",
 		sourceLocale: definition.sourceLocale,
 		requiredLocales: [...definition.requiredLocales],
 		variables: definition.variables,
@@ -160,41 +150,64 @@ function compileContext(definitionInput: CanonicalContextDefinition): S11tCompil
 	};
 }
 
-export function compileCatalog(
-	canonicalDefinitions: readonly CanonicalContextDefinition[],
-	options: CompileCatalogOptions,
-): S11tCatalogArtifactV1 {
+function validateAliases(
+	aliases: Record<string, string>,
+	contexts: Record<string, S11tCompiledContextV2>,
+): void {
+	for (const [alias, target] of Object.entries(aliases)) {
+		if (alias === target || Object.hasOwn(contexts, alias) || !Object.hasOwn(contexts, target)) {
+			throw new TypeError(`Invalid context alias: ${alias} -> ${target}`);
+		}
+		if (Object.hasOwn(aliases, target)) {
+			throw new TypeError(`Context alias chains are not supported: ${alias} -> ${target}`);
+		}
+	}
+}
+
+export function compileCatalogV2(
+	canonicalDefinitions: readonly CanonicalContextDefinitionV2[],
+	options: CompileCatalogV2Options,
+): S11tCatalogArtifactV2 {
 	const definitions = [...canonicalDefinitions].sort((left, right) =>
-		compareCodeUnits(left.id, right.id),
+		compareCodeUnits(left.key, right.key),
 	);
-	const contexts: Record<string, S11tCompiledContextV1> = {};
+	const contexts: Record<string, S11tCompiledContextV2> = {};
 	const releaseDigests: Record<string, string> = {};
+	const requiredLocales: Record<string, string[]> = {};
 	for (const definition of definitions) {
-		if (Object.hasOwn(contexts, definition.id)) {
-			throw new TypeError(`Duplicate context ID: ${definition.id}`);
+		if (Object.hasOwn(contexts, definition.key)) {
+			throw new TypeError(`Duplicate context key: ${definition.key}`);
 		}
 		const context = compileContext(definition);
-		contexts[definition.id] = context;
-		releaseDigests[definition.id] = context.releaseDigest;
+		contexts[definition.key] = context;
+		releaseDigests[definition.key] = context.releaseDigest;
+		requiredLocales[definition.key] = [...context.requiredLocales];
 	}
-	const artifact: S11tCatalogArtifactV1 = {
+	const aliases = Object.fromEntries(
+		Object.entries(options.aliases ?? {}).sort(([left], [right]) => compareCodeUnits(left, right)),
+	);
+	validateAliases(aliases, contexts);
+	const policyDigest = hashPolicyV2({ releaseProfile: options.releaseProfile, requiredLocales });
+	const artifact: S11tCatalogArtifactV2 = {
 		format: "s11t.catalog",
-		schemaVersion: 1,
+		schemaVersion: 2,
 		compilerVersion: COMPILER_VERSION,
-		defaultLocale: options.defaultLocale,
+		releaseProfile: options.releaseProfile,
+		policyDigest,
 		createdFrom: {
 			configPath: options.provenance.configPath,
 			sourceFiles: [...options.provenance.sourceFiles].sort(compareCodeUnits),
 		},
 		contexts,
-		catalogDigest: hashCatalog({
-			schemaVersion: 1,
+		aliases,
+		catalogDigest: hashCatalogV2({
 			compilerVersion: COMPILER_VERSION,
-			defaultLocale: options.defaultLocale,
+			policyDigest,
 			releaseDigests,
+			aliases,
 		}),
 	};
-	assertCatalogArtifactV1(artifact);
-	assertCatalogIntegrityV1(artifact);
+	assertCatalogArtifactV2(artifact);
+	assertCatalogIntegrityV2(artifact);
 	return artifact;
 }

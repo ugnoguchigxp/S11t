@@ -1,0 +1,9 @@
+text = '''構造化応答を修復してください。
+[[outputRequirements]]'''
+
+[variables.outputRequirements]
+profile = "trusted.block"
+
+[translations.en-US]
+text = '''Repair the structured response.
+[[outputRequirements]]'''
