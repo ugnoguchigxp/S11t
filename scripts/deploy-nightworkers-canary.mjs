@@ -126,13 +126,39 @@ function validateManifest(path, commit) {
 	return { manifest, version };
 }
 
-function backupManagedFiles(target, backupRoot) {
+function snapshotTree(root) {
+	if (!existsSync(root)) return [];
+	const result = [];
+	function visit(directory, prefix = "") {
+		for (const entry of readdirSync(directory, { withFileTypes: true }).sort((left, right) =>
+			left.name < right.name ? -1 : left.name > right.name ? 1 : 0,
+		)) {
+			const path = resolve(directory, entry.name);
+			const relativePath = prefix === "" ? entry.name : `${prefix}/${entry.name}`;
+			if (entry.isDirectory()) visit(path, relativePath);
+			else if (entry.isFile()) result.push({ path: relativePath, sha512: checksum(path) });
+			else throw new Error(`Unsupported managed file type: ${path}`);
+		}
+	}
+	visit(root);
+	return result;
+}
+
+export function backupManagedFiles(target, backupRoot) {
 	const files = ["package.json", "bun.lock"];
-	const state = { files: new Map(), vendorExists: existsSync(resolve(target, "vendor/s11t")) };
+	const vendorPath = resolve(target, "vendor/s11t");
+	const state = {
+		files: new Map(),
+		vendorExists: existsSync(vendorPath),
+		vendorSnapshot: snapshotTree(vendorPath),
+	};
 	for (const file of files) {
 		const source = resolve(target, file);
 		const present = existsSync(source);
-		state.files.set(file, present);
+		state.files.set(file, {
+			present,
+			...(present ? { sha512: checksum(source) } : {}),
+		});
 		if (present) {
 			mkdirSync(resolve(backupRoot, dirname(file)), { recursive: true });
 			cpSync(source, resolve(backupRoot, file));
@@ -147,15 +173,37 @@ function backupManagedFiles(target, backupRoot) {
 	return state;
 }
 
-function restoreManagedFiles(target, backupRoot, state) {
-	for (const [file, present] of state.files) {
+export function assertManagedFilesRestored(target, state) {
+	for (const [file, expected] of state.files) {
+		const destination = resolve(target, file);
+		if (existsSync(destination) !== expected.present) {
+			throw new Error(`Rollback did not restore ${file} presence`);
+		}
+		if (expected.present && checksum(destination) !== expected.sha512) {
+			throw new Error(`Rollback did not restore ${file} bytes`);
+		}
+	}
+	const vendor = resolve(target, "vendor/s11t");
+	if (existsSync(vendor) !== state.vendorExists) {
+		throw new Error("Rollback did not restore vendor/s11t presence");
+	}
+	if (state.vendorExists) {
+		const actual = JSON.stringify(snapshotTree(vendor));
+		const expected = JSON.stringify(state.vendorSnapshot);
+		if (actual !== expected) throw new Error("Rollback did not restore vendor/s11t bytes");
+	}
+}
+
+export function restoreManagedFiles(target, backupRoot, state) {
+	for (const [file, expected] of state.files) {
 		const destination = resolve(target, file);
 		rmSync(destination, { force: true });
-		if (present) cpSync(resolve(backupRoot, file), destination);
+		if (expected.present) cpSync(resolve(backupRoot, file), destination);
 	}
 	const vendor = resolve(target, "vendor/s11t");
 	rmSync(vendor, { recursive: true, force: true });
 	if (state.vendorExists) cpSync(resolve(backupRoot, "vendor/s11t"), vendor, { recursive: true });
+	assertManagedFilesRestored(target, state);
 }
 
 function installManifest(target, artifactDirectory, manifest, version, commit) {
@@ -248,63 +296,84 @@ function pruneOldTarballs(target, keep) {
 	}
 }
 
-const { target, verify } = parseArguments(process.argv.slice(2));
-assertNightWorkers(target);
-const commit = captured("git", ["rev-parse", "HEAD"], repositoryRoot);
-if (!/^[0-9a-f]{40}$/.test(commit)) throw new Error("S11t HEAD is not a full Git commit SHA");
-const sourceStatus = captured("git", ["status", "--porcelain"], repositoryRoot);
-if (sourceStatus !== "") {
-	process.stderr.write(
-		"S11t has uncommitted changes; deployment intentionally uses the committed HEAD only.\n",
-	);
+export function main(arguments_ = process.argv.slice(2)) {
+	const { target, verify } = parseArguments(arguments_);
+	assertNightWorkers(target);
+	const commit = captured("git", ["rev-parse", "HEAD"], repositoryRoot);
+	if (!/^[0-9a-f]{40}$/.test(commit)) throw new Error("S11t HEAD is not a full Git commit SHA");
+	const sourceStatus = captured("git", ["status", "--porcelain"], repositoryRoot);
+	if (sourceStatus !== "") {
+		process.stderr.write(
+			"S11t has uncommitted changes; deployment intentionally uses the committed HEAD only.\n",
+		);
+	}
+
+	const temporaryRoot = mkdtempSync(resolve(tmpdir(), "s11t-nightworkers-deploy-"));
+	const worktree = resolve(temporaryRoot, "source");
+	const backupRoot = resolve(temporaryRoot, "backup");
+	let worktreeRegistered = false;
+	let backupState;
+	let targetMutated = false;
+
+	try {
+		execute("git", ["worktree", "add", "--detach", worktree, commit], repositoryRoot);
+		worktreeRegistered = true;
+		execute(pnpm, ["install", "--frozen-lockfile", "--ignore-scripts"], worktree);
+		execute(pnpm, ["version:canary"], worktree);
+		execute(
+			pnpm,
+			["release:dry-run", "--", "--channel", "canary", "--allow-snapshot-changes"],
+			worktree,
+		);
+
+		const artifactDirectory = resolve(worktree, ".artifacts/packages");
+		const { manifest, version } = validateManifest(
+			resolve(artifactDirectory, "manifest.json"),
+			commit,
+		);
+		backupState = backupManagedFiles(target, backupRoot);
+		targetMutated = true;
+		const { runtime, cli } = installManifest(
+			target,
+			artifactDirectory,
+			manifest,
+			version,
+			commit,
+		);
+		verifyNightWorkers(target, runtime, cli, version, verify);
+		pruneOldTarballs(target, new Set([runtime.file, cli.file]));
+		process.stdout.write(
+			`Deployed S11t ${version} from ${commit} to ${relative(dirname(target), target)}.\n`,
+		);
+	} catch (error) {
+		if (targetMutated && backupState !== undefined) {
+			process.stderr.write("Deployment failed; restoring NightWorkers package files.\n");
+			try {
+				restoreManagedFiles(target, backupRoot, backupState);
+				const bunLockState = backupState.files.get("bun.lock");
+				if (bunLockState?.present === true) {
+					execute(bun, ["install", "--frozen-lockfile", "--ignore-scripts"], target);
+				} else {
+					execute(bun, ["install", "--ignore-scripts"], target);
+					rmSync(resolve(target, "bun.lock"), { force: true });
+				}
+				assertManagedFilesRestored(target, backupState);
+			} catch (rollbackError) {
+				throw new AggregateError(
+					[error, rollbackError],
+					"Deployment failed and NightWorkers rollback was incomplete",
+				);
+			}
+		}
+		throw error;
+	} finally {
+		if (worktreeRegistered) {
+			execute("git", ["worktree", "remove", "--force", worktree], repositoryRoot, {
+				allowFailure: true,
+			});
+		}
+		rmSync(temporaryRoot, { recursive: true, force: true });
+	}
 }
 
-const temporaryRoot = mkdtempSync(resolve(tmpdir(), "s11t-nightworkers-deploy-"));
-const worktree = resolve(temporaryRoot, "source");
-const backupRoot = resolve(temporaryRoot, "backup");
-let worktreeRegistered = false;
-let backupState;
-let targetMutated = false;
-
-try {
-	execute("git", ["worktree", "add", "--detach", worktree, commit], repositoryRoot);
-	worktreeRegistered = true;
-	execute(pnpm, ["install", "--frozen-lockfile", "--ignore-scripts"], worktree);
-	execute(pnpm, ["version:canary"], worktree);
-	execute(
-		pnpm,
-		["release:dry-run", "--", "--channel", "canary", "--allow-snapshot-changes"],
-		worktree,
-	);
-
-	const artifactDirectory = resolve(worktree, ".artifacts/packages");
-	const { manifest, version } = validateManifest(resolve(artifactDirectory, "manifest.json"), commit);
-	backupState = backupManagedFiles(target, backupRoot);
-	targetMutated = true;
-	const { runtime, cli } = installManifest(
-		target,
-		artifactDirectory,
-		manifest,
-		version,
-		commit,
-	);
-	verifyNightWorkers(target, runtime, cli, version, verify);
-	pruneOldTarballs(target, new Set([runtime.file, cli.file]));
-	process.stdout.write(
-		`Deployed S11t ${version} from ${commit} to ${relative(dirname(target), target)}.\n`,
-	);
-} catch (error) {
-	if (targetMutated && backupState !== undefined) {
-		process.stderr.write("Deployment failed; restoring NightWorkers package files.\n");
-		restoreManagedFiles(target, backupRoot, backupState);
-		execute(bun, ["install", "--ignore-scripts"], target, { allowFailure: true });
-	}
-	throw error;
-} finally {
-	if (worktreeRegistered) {
-		execute("git", ["worktree", "remove", "--force", worktree], repositoryRoot, {
-			allowFailure: true,
-		});
-	}
-	rmSync(temporaryRoot, { recursive: true, force: true });
-}
+if (process.argv[1] !== undefined && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) main();

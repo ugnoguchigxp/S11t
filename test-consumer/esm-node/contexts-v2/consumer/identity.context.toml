@@ -1,4 +1,7 @@
-text = '''Task: [[taskGoal]]'''
+text = '''タスク: [[taskGoal]]'''
 
 [variables.taskGoal]
-profile = "trusted.inline"
+profile = "untrusted.text"
+
+[translations.en-US]
+text = '''Task: [[taskGoal]]'''

@@ -4,6 +4,10 @@ Portable S11t artifact contracts, deterministic compiler primitives, and the typ
 
 This package intentionally does not use Node.js builtins, filesystem APIs, process state, or TOML parsing.
 
+```sh
+npm install @s11t/runtime
+```
+
 Applications pass an artifact object to `createCatalog()` (normally through a generated `createAppCatalog()` factory), bind a request locale, and render typed system context.
 
 Artifact v2 has no default locale. The host selects language once in its top-level request/run settings and
@@ -29,3 +33,9 @@ liveText("context.key", values);
 The text-only APIs return `invocation.content.text` byte-for-byte, but intentionally discard the manifest.
 Generated v2 contracts use `Record<string, never>` for contexts without variables so extra values remain a
 compile-time error.
+
+Use `bind()` on provider and audit paths so content and its immutable manifest stay correlated. Treat
+user messages, model/provider output, tool output, and retrieved content as `untrusted` authoring
+variables with a non-raw encoding. See the
+[complete v2 guide](https://github.com/ugnoguchigxp/S11t/blob/main/docs/guides/getting-started.md) and
+[backend integration guide](https://github.com/ugnoguchigxp/S11t/blob/main/docs/guides/backend-integration.md).

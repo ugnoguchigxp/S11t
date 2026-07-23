@@ -1,6 +1,14 @@
-import { randomBytes } from "node:crypto";
-import { readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
-import { basename, relative, resolve } from "node:path";
+import { createHash, randomBytes } from "node:crypto";
+import {
+	existsSync,
+	mkdirSync,
+	readFileSync,
+	readdirSync,
+	renameSync,
+	rmSync,
+	writeFileSync,
+} from "node:fs";
+import { basename, dirname, isAbsolute, relative, resolve, sep } from "node:path";
 
 import type { CanonicalVariableDefinition } from "@s11t/runtime/compiler";
 import { parse } from "smol-toml";
@@ -19,18 +27,49 @@ import {
 	type LoadedProjectV2,
 } from "./discover.js";
 import { S11tDiagnosticError, type S11tDiagnostic } from "./diagnostics.js";
+import { resolvesWithin } from "./path-safety.js";
 
 export type AuthoringV2MigrationResult = {
 	written: boolean;
+	restored: boolean;
+	operationId?: string;
 	contexts: number;
 	profiles: number;
 	aliases: number;
 	mappings: Array<{ file: string; oldKey: string; canonicalKey: string }>;
 };
 
-function diagnostic(message: string, file: string, path: Array<string | number> = []): never {
+type MigrationManifest = {
+	schemaVersion: 1;
+	operation: "authoring-v2";
+	operationId: string;
+	state: "prepared" | "committed" | "rolled-back";
+	configPath: string;
+	summary: {
+		contexts: number;
+		profiles: number;
+		aliases: number;
+		mappings: AuthoringV2MigrationResult["mappings"];
+	};
+	files: Array<{
+		path: string;
+		backup: string;
+		beforeSha256: string;
+		afterSha256: string;
+	}>;
+};
+
+const OPERATION_ID_PATTERN = /^authoring-v2-[0-9a-f]{24}$/;
+const SHA256_PATTERN = /^sha256:[0-9a-f]{64}$/;
+
+function diagnostic(
+	message: string,
+	file: string,
+	path: Array<string | number> = [],
+	code = "S11T_AUTHORING_MIGRATION_DRIFT",
+): never {
 	const value: S11tDiagnostic = {
-		code: "S11T_AUTHORING_MIGRATION_DRIFT",
+		code,
 		severity: "error",
 		message,
 		file,
@@ -176,6 +215,287 @@ function atomicWrite(path: string, bytes: string): void {
 	}
 }
 
+function comparePaths(left: string, right: string): number {
+	return compareCodeUnits(left.replaceAll("\\", "/"), right.replaceAll("\\", "/"));
+}
+
+function sha256(bytes: string): string {
+	return `sha256:${createHash("sha256").update(bytes).digest("hex")}`;
+}
+
+function migrationRoot(configDirectory: string): string {
+	const root = resolve(configDirectory, ".s11t/migrations");
+	if (!resolvesWithin(configDirectory, root)) {
+		return diagnostic(
+			"Migration backup directory resolves outside the config directory",
+			root,
+			[],
+			"S11T_AUTHORING_MIGRATION_INVALID",
+		);
+	}
+	return root;
+}
+
+function operationDirectory(configDirectory: string, operationId: string): string {
+	if (!OPERATION_ID_PATTERN.test(operationId)) {
+		return diagnostic(
+			"Invalid migration operation ID",
+			"s11t.config.toml",
+			["operationId"],
+			"S11T_AUTHORING_MIGRATION_INVALID",
+		);
+	}
+	return resolve(migrationRoot(configDirectory), operationId);
+}
+
+function relativeMigrationPath(configDirectory: string, path: string): string {
+	const result = relative(configDirectory, path);
+	if (result === "" || isAbsolute(result) || result === ".." || result.startsWith(`..${sep}`)) {
+		return diagnostic(
+			"Migration target escapes the config directory",
+			path,
+			[],
+			"S11T_AUTHORING_MIGRATION_INVALID",
+		);
+	}
+	return result.replaceAll("\\", "/");
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+	return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+function parseManifest(input: unknown, file: string): MigrationManifest {
+	if (!isRecord(input)) {
+		return diagnostic("Invalid migration manifest", file, [], "S11T_AUTHORING_MIGRATION_INVALID");
+	}
+	const manifest = input as Partial<MigrationManifest>;
+	const summary = manifest.summary;
+	if (
+		manifest.schemaVersion !== 1 ||
+		manifest.operation !== "authoring-v2" ||
+		typeof manifest.operationId !== "string" ||
+		!OPERATION_ID_PATTERN.test(manifest.operationId) ||
+		!["prepared", "committed", "rolled-back"].includes(manifest.state ?? "") ||
+		typeof manifest.configPath !== "string" ||
+		!isRecord(summary) ||
+		!Array.isArray(summary.mappings) ||
+		!Number.isSafeInteger(summary.contexts) ||
+		(summary.contexts as number) < 0 ||
+		!Number.isSafeInteger(summary.profiles) ||
+		(summary.profiles as number) < 0 ||
+		!Number.isSafeInteger(summary.aliases) ||
+		(summary.aliases as number) < 0 ||
+		!Array.isArray(manifest.files) ||
+		manifest.files.length === 0
+	) {
+		return diagnostic("Invalid migration manifest", file, [], "S11T_AUTHORING_MIGRATION_INVALID");
+	}
+	const mappingFiles = new Set<string>();
+	for (const [index, mapping] of summary.mappings.entries()) {
+		if (
+			!isRecord(mapping) ||
+			typeof mapping.file !== "string" ||
+			mapping.file.length === 0 ||
+			typeof mapping.oldKey !== "string" ||
+			mapping.oldKey.length === 0 ||
+			typeof mapping.canonicalKey !== "string" ||
+			mapping.canonicalKey.length === 0 ||
+			mappingFiles.has(mapping.file)
+		) {
+			return diagnostic(
+				"Invalid migration manifest mapping",
+				file,
+				["summary", "mappings", index],
+				"S11T_AUTHORING_MIGRATION_INVALID",
+			);
+		}
+		mappingFiles.add(mapping.file);
+	}
+	const paths = new Set<string>();
+	const backups = new Set<string>();
+	for (const [index, entry] of manifest.files.entries()) {
+		if (
+			!isRecord(entry) ||
+			typeof entry.path !== "string" ||
+			entry.path.length === 0 ||
+			typeof entry.backup !== "string" ||
+			!/^[^/\\]+\.bak$/.test(entry.backup) ||
+			typeof entry.beforeSha256 !== "string" ||
+			!SHA256_PATTERN.test(entry.beforeSha256) ||
+			typeof entry.afterSha256 !== "string" ||
+			!SHA256_PATTERN.test(entry.afterSha256) ||
+			paths.has(entry.path) ||
+			backups.has(entry.backup)
+		) {
+			return diagnostic(
+				"Invalid migration manifest file entry",
+				file,
+				["files", index],
+				"S11T_AUTHORING_MIGRATION_INVALID",
+			);
+		}
+		paths.add(entry.path);
+		backups.add(entry.backup);
+	}
+	const expectedPaths = new Set([manifest.configPath, ...mappingFiles]);
+	if (
+		summary.contexts !== summary.mappings.length ||
+		summary.aliases !== summary.contexts ||
+		paths.size !== expectedPaths.size ||
+		[...paths].some((path) => !expectedPaths.has(path))
+	) {
+		return diagnostic(
+			"Migration manifest summary does not match its file set",
+			file,
+			["summary"],
+			"S11T_AUTHORING_MIGRATION_INVALID",
+		);
+	}
+	return manifest as MigrationManifest;
+}
+
+function readManifest(configDirectory: string, operationId: string): MigrationManifest {
+	const directory = operationDirectory(configDirectory, operationId);
+	const manifestPath = resolve(directory, "manifest.json");
+	let input: unknown;
+	try {
+		input = JSON.parse(readFileSync(manifestPath, "utf8"));
+	} catch (error) {
+		const message = error instanceof Error ? error.message : String(error);
+		return diagnostic(
+			`Unable to read migration manifest: ${message}`,
+			manifestPath,
+			[],
+			"S11T_AUTHORING_MIGRATION_INVALID",
+		);
+	}
+	const manifest = parseManifest(input, manifestPath);
+	if (manifest.operationId !== operationId) {
+		return diagnostic(
+			"Migration manifest operation ID does not match its directory",
+			manifestPath,
+			["operationId"],
+			"S11T_AUTHORING_MIGRATION_INVALID",
+		);
+	}
+	return manifest;
+}
+
+function writeManifest(configDirectory: string, manifest: MigrationManifest): void {
+	const path = resolve(operationDirectory(configDirectory, manifest.operationId), "manifest.json");
+	atomicWrite(path, `${JSON.stringify(manifest, null, 2)}\n`);
+}
+
+function pendingMigration(configDirectory: string): string | undefined {
+	const root = migrationRoot(configDirectory);
+	if (!existsSync(root)) return undefined;
+	for (const entry of readdirSync(root, { withFileTypes: true }).sort((left, right) =>
+		compareCodeUnits(left.name, right.name),
+	)) {
+		if (!entry.isDirectory() || !OPERATION_ID_PATTERN.test(entry.name)) continue;
+		const manifest = readManifest(configDirectory, entry.name);
+		if (manifest.state === "prepared") return entry.name;
+	}
+	return undefined;
+}
+
+function prepareMigration(
+	project: LoadedProjectV1,
+	writes: ReadonlyMap<string, string>,
+	summary: MigrationManifest["summary"],
+): MigrationManifest {
+	const operationId = `authoring-v2-${randomBytes(12).toString("hex")}`;
+	const root = migrationRoot(project.configDirectory);
+	mkdirSync(root, { recursive: true });
+	const preparingDirectory = resolve(root, `.preparing-${operationId}`);
+	const preparedDirectory = operationDirectory(project.configDirectory, operationId);
+	mkdirSync(preparingDirectory, { recursive: false, mode: 0o700 });
+	try {
+		const files = [...writes.entries()]
+			.sort(([left], [right]) => comparePaths(left, right))
+			.map(([path, afterBytes], index) => {
+				const beforeBytes = readFileSync(path, "utf8");
+				const backup = `${String(index).padStart(4, "0")}.bak`;
+				writeFileSync(resolve(preparingDirectory, backup), beforeBytes, {
+					encoding: "utf8",
+					flag: "wx",
+					mode: 0o600,
+				});
+				return {
+					path: relativeMigrationPath(project.configDirectory, path),
+					backup,
+					beforeSha256: sha256(beforeBytes),
+					afterSha256: sha256(afterBytes),
+				};
+			});
+		const manifest: MigrationManifest = {
+			schemaVersion: 1,
+			operation: "authoring-v2",
+			operationId,
+			state: "prepared",
+			configPath: relativeMigrationPath(project.configDirectory, project.configPath),
+			summary,
+			files,
+		};
+		writeFileSync(resolve(preparingDirectory, "manifest.json"), `${JSON.stringify(manifest, null, 2)}\n`, {
+			encoding: "utf8",
+			flag: "wx",
+			mode: 0o600,
+		});
+		renameSync(preparingDirectory, preparedDirectory);
+		return manifest;
+	} catch (error) {
+		rmSync(preparingDirectory, { recursive: true, force: true });
+		throw error;
+	}
+}
+
+function restoreFiles(configDirectory: string, manifest: MigrationManifest): void {
+	const directory = operationDirectory(configDirectory, manifest.operationId);
+	const restorePlan = manifest.files.map((entry) => {
+		const path = resolve(configDirectory, entry.path);
+		if (
+			relativeMigrationPath(configDirectory, path) !== entry.path ||
+			!resolvesWithin(configDirectory, path)
+		) {
+			return diagnostic(
+				"Migration manifest contains a non-canonical target path",
+				resolve(directory, "manifest.json"),
+				["files", entry.path],
+				"S11T_AUTHORING_MIGRATION_INVALID",
+			);
+		}
+		const backupPath = resolve(directory, entry.backup);
+		const bytes = readFileSync(backupPath, "utf8");
+		if (sha256(bytes) !== entry.beforeSha256) {
+			return diagnostic(
+				"Migration backup checksum mismatch",
+				backupPath,
+				[],
+				"S11T_AUTHORING_MIGRATION_INVALID",
+			);
+		}
+		const current = readFileSync(path, "utf8");
+		const currentSha256 = sha256(current);
+		if (currentSha256 !== entry.beforeSha256 && currentSha256 !== entry.afterSha256) {
+			return diagnostic(
+				"Migration target changed after the operation; refusing to overwrite it",
+				path,
+				[],
+				"S11T_AUTHORING_MIGRATION_DRIFT",
+			);
+		}
+		return { path, bytes, beforeSha256: entry.beforeSha256 };
+	});
+	for (const entry of restorePlan) atomicWrite(entry.path, entry.bytes);
+	for (const entry of restorePlan) {
+		if (sha256(readFileSync(entry.path, "utf8")) !== entry.beforeSha256) {
+			throw new Error(`Migration restore verification failed for ${entry.path}`);
+		}
+	}
+}
+
 function semanticSnapshot(definition: {
 	owner: string;
 	sourceLocale: string;
@@ -266,8 +586,59 @@ function validateMigrationPlan(
 }
 
 export function migrateAuthoringV2(
-	options: { config?: string; cwd?: string; write?: boolean } = {},
+	options: { config?: string; cwd?: string; write?: boolean; restore?: string } = {},
 ): AuthoringV2MigrationResult {
+	if (options.restore !== undefined) {
+		if (options.write === true) {
+			return diagnostic(
+				"--write and --restore cannot be used together",
+				options.config ?? "s11t.config.toml",
+				[],
+				"S11T_AUTHORING_MIGRATION_INVALID",
+			);
+		}
+		const configPath = resolve(options.cwd ?? process.cwd(), options.config ?? "s11t.config.toml");
+		const configDirectory = dirname(configPath);
+		const manifest = readManifest(configDirectory, options.restore);
+		if (manifest.configPath !== relativeMigrationPath(configDirectory, configPath)) {
+			return diagnostic(
+				"Migration manifest belongs to a different config",
+				resolve(operationDirectory(configDirectory, options.restore), "manifest.json"),
+				["configPath"],
+				"S11T_AUTHORING_MIGRATION_INVALID",
+			);
+		}
+		if (manifest.state === "rolled-back") {
+			return diagnostic(
+				"Migration operation has already been restored",
+				resolve(operationDirectory(configDirectory, options.restore), "manifest.json"),
+				["state"],
+				"S11T_AUTHORING_MIGRATION_INVALID",
+			);
+		}
+		restoreFiles(configDirectory, manifest);
+		manifest.state = "rolled-back";
+		writeManifest(configDirectory, manifest);
+		return {
+			written: false,
+			restored: true,
+			operationId: manifest.operationId,
+			...manifest.summary,
+		};
+	}
+	if (options.write === true) {
+		const configPath = resolve(options.cwd ?? process.cwd(), options.config ?? "s11t.config.toml");
+		const configDirectory = dirname(configPath);
+		const pending = pendingMigration(configDirectory);
+		if (pending !== undefined) {
+			return diagnostic(
+				`Migration ${pending} is incomplete; restore it before starting another write`,
+				resolve(operationDirectory(configDirectory, pending), "manifest.json"),
+				["state"],
+				"S11T_AUTHORING_MIGRATION_PENDING",
+			);
+		}
+	}
 	const project = loadProject(options.config, options.cwd);
 	if (!isLoadedProjectV1(project)) {
 		return diagnostic("authoring-v2 migration requires a config v1 project", project.configPath);
@@ -319,11 +690,17 @@ export function migrateAuthoringV2(
 		}),
 	);
 	validateMigrationPlan(project, writes, mappings);
+	let operationId: string | undefined;
 	if (options.write === true) {
-		const originals = new Map<string, string>();
+		const manifest = prepareMigration(project, writes, {
+			contexts: project.documents.length,
+			profiles: Object.keys(profiles).length,
+			aliases: Object.keys(aliases).length,
+			mappings,
+		});
+		operationId = manifest.operationId;
 		try {
 			for (const [path, bytes] of writes) {
-				originals.set(path, readFileSync(path, "utf8"));
 				atomicWrite(path, bytes);
 			}
 			const migrated = loadProject(options.config, options.cwd, "development");
@@ -342,18 +719,16 @@ export function migrateAuthoringV2(
 					return diagnostic("Migration changed content, variable, section, owner, or locale semantics", before.file);
 				}
 			}
+			manifest.state = "committed";
+			writeManifest(project.configDirectory, manifest);
 		} catch (error) {
-			const rollbackErrors: unknown[] = [];
-			for (const [path, bytes] of [...originals].reverse()) {
-				try {
-					atomicWrite(path, bytes);
-				} catch (rollbackError) {
-					rollbackErrors.push(rollbackError);
-				}
-			}
-			if (rollbackErrors.length > 0) {
+			try {
+				restoreFiles(project.configDirectory, manifest);
+				manifest.state = "rolled-back";
+				writeManifest(project.configDirectory, manifest);
+			} catch (rollbackError) {
 				throw new AggregateError(
-					[error, ...rollbackErrors],
+					[error, rollbackError],
 					"Migration failed and rollback was incomplete",
 				);
 			}
@@ -362,6 +737,8 @@ export function migrateAuthoringV2(
 	}
 	return {
 		written: options.write === true,
+		restored: false,
+		...(operationId === undefined ? {} : { operationId }),
 		contexts: project.documents.length,
 		profiles: Object.keys(profiles).length,
 		aliases: Object.keys(aliases).length,

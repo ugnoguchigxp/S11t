@@ -93,10 +93,22 @@ try {
 	}
 	if (
 		!result.textV2?.includes("tarballを検証する") ||
-		result.statusTextV2 !== "Ready\n" ||
-		result.liveStatusTextV2 !== "Ready\n"
+		result.statusTextV2 !== "準備完了\n" ||
+		result.liveStatusTextJaV2 !== "準備完了\n" ||
+		result.liveStatusTextEnV2 !== "Ready\n" ||
+		result.fixedStatusAfterLanguageChangeV2 !== "準備完了\n"
 	) {
-		throw new Error("Consumer did not render the artifact v2 text adapters");
+		throw new Error("Consumer did not preserve snapshot and live language-switch semantics");
+	}
+	if (
+		result.invocationV2?.manifest?.requestedLocale !== "ja-JP" ||
+		result.invocationV2?.manifest?.resolvedLocale !== "ja-JP" ||
+		result.invocationV2?.manifest?.fallbackLocales?.length !== 0 ||
+		result.invocationV2?.manifest?.renderedHash === undefined ||
+		result.invocationV2?.manifest?.releaseDigest === undefined ||
+		result.invocationV2?.manifest?.policyDigest === undefined
+	) {
+		throw new Error("Consumer did not retain the artifact v2 invocation manifest");
 	}
 	const expectedVersion = manifest.packages[0]?.version;
 	if (invocation.manifest?.compilerVersion !== expectedVersion) {

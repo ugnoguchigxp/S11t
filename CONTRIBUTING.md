@@ -6,9 +6,7 @@ Before submitting a change, run:
 
 ```sh
 pnpm install --frozen-lockfile
-pnpm typecheck
-pnpm test
-pnpm build
+pnpm verify
 pnpm test:packages
 ```
 

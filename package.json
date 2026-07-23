@@ -21,8 +21,9 @@
     "clean": "tsc -b --clean",
     "typecheck": "tsc -b --pretty false",
     "test": "vitest run",
-    "test:schema-drift": "vitest run packages/runtime/tests/artifact-schema.test.ts",
-    "test:cross-node": "vitest run packages/runtime/tests/hash.test.ts",
+    "test:coverage": "vitest run --coverage",
+    "test:schema-drift": "vitest run packages/runtime/tests/artifact-schema.test.ts packages/runtime/tests/artifact-schema-v2.test.ts packages/cli/tests/authoring-json-schema.test.ts packages/cli/tests/authoring-v2-json-schema.test.ts",
+    "test:cross-node": "vitest run packages/runtime/tests/hash.test.ts packages/runtime/tests/hash-v2.test.ts",
     "test:no-node-builtins": "node scripts/check-runtime-boundary.mjs",
     "test:browser-bundle": "node scripts/check-browser-bundle.mjs",
     "test:type-fixtures": "tsc -p test-consumer/types/tsconfig.json --pretty false",
@@ -36,12 +37,13 @@
     "test:packages": "pnpm pack:all && pnpm test:package-contents && pnpm test:consumer",
     "release:dry-run": "node scripts/release-dry-run.mjs",
     "deploy:nightworkers-canary": "node scripts/deploy-nightworkers-canary.mjs",
-    "verify": "pnpm check:versions && pnpm typecheck && pnpm test && pnpm build && pnpm test:type-fixtures && pnpm test:no-node-builtins && pnpm test:browser-bundle && pnpm exec s11t --help"
+    "verify": "pnpm check:versions && pnpm typecheck && pnpm test:coverage && pnpm build && pnpm test:type-fixtures && pnpm test:no-node-builtins && pnpm test:browser-bundle && pnpm exec s11t --help"
   },
   "devDependencies": {
     "@changesets/cli": "2.31.1",
     "@s11t/cli": "workspace:*",
     "@types/node": "26.1.1",
+    "@vitest/coverage-v8": "4.1.10",
     "ajv": "8.20.0",
     "cross-spawn": "7.0.6",
     "esbuild": "0.28.1",

@@ -76,5 +76,6 @@ describe("generated type contract", () => {
 		expect(generated).toContain('"example.empty": Record<string, never>;');
 		expect(generated).toContain('"example:empty": Record<string, never>;');
 		expect(generated).not.toContain('"example.empty": {};');
+		expect(generated).not.toContain("JsonValue");
 	});
 });

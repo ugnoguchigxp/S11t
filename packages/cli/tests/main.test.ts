@@ -53,7 +53,7 @@ describe("CLI", () => {
 		expect(execute(["build"], directory).code).toBe(0);
 		expect(execute(["build", "--check"], directory).code).toBe(0);
 		const inspected = execute(
-			["inspect", "codingAgent:identity", "--locale", "en-US"],
+			["inspect", "codingAgent:identity", "--locale", "en-US", "--format", "json"],
 			directory,
 		);
 		expect(inspected.code).toBe(0);
@@ -68,9 +68,75 @@ describe("CLI", () => {
 		);
 	});
 
+	it("formats resolved v2 inspection for humans and JSON consumers", () => {
+		const directory = temporaryFixture("valid/content-first");
+		const base = [
+			"inspect",
+			"structuredGeneration.repair",
+			"--resolved",
+			"--release-profile",
+			"production",
+		];
+		const human = execute(base, directory);
+		expect(human).toMatchObject({ code: 0, stderr: "" });
+		expect(human.stdout).toContain("key: structuredGeneration.repair\n");
+		expect(human.stdout).toContain("origins:\n");
+		expect(human.stdout).toContain("\trequiredLocales: release_profiles.production\n");
+
+		const json = execute([...base, "--format", "json"], directory);
+		expect(json).toMatchObject({ code: 0, stderr: "" });
+		expect(JSON.parse(json.stdout)).toEqual(
+			expect.objectContaining({
+				key: "structuredGeneration.repair",
+				releaseProfile: "production",
+				origins: expect.objectContaining({
+					requiredLocales: "release_profiles.production",
+				}),
+			}),
+		);
+	});
+
+	it("returns and restores a durable migration operation through the CLI", () => {
+		const directory = temporaryFixture("valid/simple");
+		const written = execute(
+			["migrate", "authoring-v2", "--write", "--format", "json"],
+			directory,
+		);
+		expect(written).toMatchObject({ code: 0, stderr: "" });
+		const operationId = JSON.parse(written.stdout).operationId as string;
+		expect(operationId).toMatch(/^authoring-v2-[0-9a-f]{24}$/);
+
+		const restored = execute(
+			["migrate", "authoring-v2", "--restore", operationId, "--format", "json"],
+			directory,
+		);
+		expect(restored).toMatchObject({ code: 0, stderr: "" });
+		expect(JSON.parse(restored.stdout)).toEqual(
+			expect.objectContaining({ restored: true, operationId }),
+		);
+	});
+
 	it("uses documented misuse and internal exit codes", () => {
 		const directory = temporaryFixture("valid/simple");
 		expect(execute(["unknown"], directory).code).toBe(2);
 		expect(execute(["inspect"], directory).code).toBe(2);
+		expect(execute(["lint", "--release-profile", "development"], directory).code).toBe(2);
+		expect(
+			execute(
+				[
+					"migrate",
+					"authoring-v2",
+					"--write",
+					"--restore",
+					"authoring-v2-000000000000000000000000",
+				],
+				directory,
+			).code,
+		).toBe(2);
+
+		const v2 = temporaryFixture("valid/content-first");
+		const missingProfile = execute(["lint"], v2);
+		expect(missingProfile.code).toBe(2);
+		expect(missingProfile.stderr).toContain("config v2 requires --release-profile");
 	});
 });

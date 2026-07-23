@@ -2,7 +2,7 @@
 // compilerVersion: 0.0.0
 // catalogDigest: sha256:9beacfd1b67bc08ef77e7440001837a79b6c127d3013cc25a8a3fd1fb8e9992f
 
-import type { CatalogContract, JsonValue } from "@s11t/runtime";
+import type { CatalogContract } from "@s11t/runtime";
 import { createCatalog } from "@s11t/runtime";
 
 export const expectedCatalogDigest = "sha256:9beacfd1b67bc08ef77e7440001837a79b6c127d3013cc25a8a3fd1fb8e9992f" as const;

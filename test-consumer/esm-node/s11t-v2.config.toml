@@ -14,10 +14,10 @@ require_owner = true
 owner = "consumer"
 
 [release_profiles.development]
-required_locales = ["$source"]
+required_locales = ["$source", "en-US"]
 
-[variable_profiles."trusted.inline"]
+[variable_profiles."untrusted.text"]
 type = "string"
-trust = "trusted"
-placement = "inline"
-encoding = "raw"
+trust = "untrusted"
+placement = "delimited-context"
+encoding = "json-string"

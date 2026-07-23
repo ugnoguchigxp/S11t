@@ -108,7 +108,12 @@ export function loadProject(
 	const sourceFiles = absoluteFiles.map((file) => posix(relative(configDirectory, file)));
 	if (config.schemaVersion === 1) {
 		if (releaseProfile !== undefined) {
-			diagnostic("S11T_CONFIG_INVALID", "--release-profile is only valid for config v2", configDisplay, []);
+			diagnostic(
+				"S11T_RELEASE_PROFILE_UNSUPPORTED",
+				"--release-profile is only valid for config v2",
+				configDisplay,
+				[],
+			);
 		}
 		const documents = absoluteFiles.map((file, index) =>
 			parseAuthoringDocument(loadToml(file, sourceFiles[index]!), sourceFiles[index]!),

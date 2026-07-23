@@ -82,6 +82,7 @@ s11t inspect structuredGeneration.repair --resolved --release-profile developmen
 ```sh
 s11t migrate authoring-v2 --config s11t.config.toml
 s11t migrate authoring-v2 --config s11t.config.toml --write
+s11t migrate authoring-v2 --config s11t.config.toml --restore authoring-v2-<operation-id>
 ```
 
 Dry-run is the default. The write form generates project-level owner, locale, release, variable-profile,
@@ -89,3 +90,8 @@ and legacy-alias policy, then reloads the v2 project and rejects any content, se
 locale semantic drift. Dry-run performs the same generated-TOML parse and semantic comparison before any
 filesystem mutation. A v1 project with per-context required locales that cannot be represented by one v2
 release profile is rejected explicitly.
+
+Before the first replacement, the write form stores original bytes, before/after SHA-256 digests, and a
+manifest under `.s11t/migrations/<operation-id>/`. A prepared operation blocks another write until it is
+restored. Restore verifies backup checksums and refuses to overwrite a target whose bytes match neither
+the recorded before nor after state.

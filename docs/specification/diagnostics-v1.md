@@ -26,4 +26,14 @@ Phase 1 authoring codes are:
 | `S11T_SOURCE_EMPTY` | No `.context.toml` files were discovered |
 | `S11T_BUILD_STALE` | `build --check` detected missing or stale generated output |
 
+Authoring v2 and migration add:
+
+| Code | Meaning |
+| --- | --- |
+| `S11T_RELEASE_PROFILE_REQUIRED` | A v2 command omitted its required release profile |
+| `S11T_RELEASE_PROFILE_UNSUPPORTED` | A v1 command received a v2-only release profile |
+| `S11T_AUTHORING_MIGRATION_DRIFT` | Migration or restore would change unrecorded semantics or bytes |
+| `S11T_AUTHORING_MIGRATION_INVALID` | Migration operation metadata, backup, or path is invalid |
+| `S11T_AUTHORING_MIGRATION_PENDING` | A prepared migration must be restored before another write |
+
 Runtime artifact validation throws `S11T_ARTIFACT_INVALID` with a structured path. Digest mismatches use `S11T_ARTIFACT_DIGEST_MISMATCH`; catalog lookup, locale resolution, and runtime value validation use the stable `S11T_CONTEXT_NOT_FOUND`, `S11T_LOCALE_NOT_FOUND`, `S11T_VALUE_MISSING`, `S11T_VALUE_EXTRA`, and `S11T_VALUE_INVALID` codes.

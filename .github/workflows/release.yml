@@ -9,13 +9,13 @@ on:
         description: Release channel
         required: true
         type: choice
-        options: [canary, stable]
+        options: [bootstrap, canary, stable]
       ref:
         description: Exact 40-character commit SHA to publish
         required: true
         type: string
       confirm:
-        description: Type publish-canary or publish-stable
+        description: Type publish-bootstrap, publish-canary, or publish-stable
         required: true
         type: string
 
@@ -52,14 +52,17 @@ jobs:
   publish:
     if: >-
       github.event_name == 'workflow_dispatch' &&
-      ((inputs.channel == 'canary' && inputs.confirm == 'publish-canary') ||
+      ((inputs.channel == 'bootstrap' && inputs.confirm == 'publish-bootstrap') ||
+       (inputs.channel == 'canary' && inputs.confirm == 'publish-canary') ||
        (inputs.channel == 'stable' && inputs.confirm == 'publish-stable'))
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    environment: ${{ inputs.channel == 'stable' && 'npm-stable' || 'npm-canary' }}
+    environment: ${{ inputs.channel == 'stable' && 'npm-stable' || inputs.channel == 'bootstrap' && 'npm-bootstrap' || 'npm-canary' }}
     permissions:
       contents: read
       id-token: write
+    env:
+      NPM_CONFIG_PROVENANCE: "true"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -76,10 +79,10 @@ jobs:
           git fetch --no-tags origin main
           MAIN_SHA="$(git rev-parse origin/main)"
           git merge-base --is-ancestor "$CHECKED_SHA" "$MAIN_SHA"
-          if [ "$RELEASE_CHANNEL" = "stable" ]; then
+          if [ "$RELEASE_CHANNEL" = "stable" ] || [ "$RELEASE_CHANNEL" = "bootstrap" ]; then
             test "$CHECKED_SHA" = "$MAIN_SHA"
           fi
-      - name: Keep stable publishing disabled until Phase 6
+      - name: Require explicit stable release enablement
         if: inputs.channel == 'stable'
         env:
           S11T_STABLE_RELEASE_ENABLED: ${{ vars.S11T_STABLE_RELEASE_ENABLED }}
@@ -90,15 +93,37 @@ jobs:
           node-version: 24
           registry-url: https://registry.npmjs.org
           package-manager-cache: false
-      - run: npm install --global npm@11.6.4 --ignore-scripts
+      - run: npm install --global npm@11.18.0 --ignore-scripts
+      - name: Confirm bootstrap is creating brand-new packages
+        if: inputs.channel == 'bootstrap'
+        run: |
+          for PACKAGE in "@s11t/runtime" "@s11t/cli"; do
+            if OUTPUT="$(npm view "$PACKAGE" version 2>&1)"; then
+              echo "$PACKAGE already exists at version $OUTPUT" >&2
+              exit 1
+            elif [[ "$OUTPUT" != *"E404"* ]]; then
+              echo "$OUTPUT" >&2
+              exit 1
+            fi
+          done
       - run: pnpm install --frozen-lockfile --ignore-scripts
       - name: Create canary snapshot version
-        if: inputs.channel == 'canary'
+        if: inputs.channel == 'canary' || inputs.channel == 'bootstrap'
         run: pnpm version:canary
+      - name: Require a fully consumed stable changeset
+        if: inputs.channel == 'stable'
+        run: test -z "$(find .changeset -maxdepth 1 -type f -name '*.md' ! -name README.md -print -quit)"
       - name: Verify release candidate
         run: >-
-          pnpm release:dry-run -- --channel ${{ inputs.channel }}
-          ${{ inputs.channel == 'canary' && '--allow-snapshot-changes' || '' }}
+          pnpm release:dry-run -- --channel ${{ inputs.channel == 'stable' && 'stable' || 'canary' }}
+          ${{ inputs.channel != 'stable' && '--allow-snapshot-changes' || '' }}
+      - name: Bootstrap first canary with a short-lived token
+        if: inputs.channel == 'bootstrap'
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_BOOTSTRAP_TOKEN }}
+        run: |
+          test -n "$NODE_AUTH_TOKEN"
+          pnpm changeset publish --tag canary --no-git-tag
       - name: Publish canary with OIDC
         if: inputs.channel == 'canary'
         run: pnpm changeset publish --tag canary --no-git-tag
@@ -112,5 +137,64 @@ jobs:
           cd .artifacts/registry-consumer
           npm init --yes
           DIST_TAG="${{ inputs.channel == 'canary' && 'canary' || 'latest' }}"
+          if [ "${{ inputs.channel }}" = "bootstrap" ]; then DIST_TAG="canary"; fi
           npm install "@s11t/runtime@$DIST_TAG" "@s11t/cli@$DIST_TAG"
           npm audit signatures
+
+  github-release:
+    if: >-
+      github.event_name == 'workflow_dispatch' &&
+      inputs.channel == 'stable' &&
+      inputs.confirm == 'publish-stable'
+    needs: publish
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ inputs.ref }}
+          fetch-depth: 0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+          package-manager-cache: false
+      - name: Resolve and verify the stable version
+        id: release
+        env:
+          RELEASE_REF: ${{ inputs.ref }}
+        run: |
+          VERSION="$(node -p "JSON.parse(require('node:fs').readFileSync('packages/runtime/package.json', 'utf8')).version")"
+          CLI_VERSION="$(node -p "JSON.parse(require('node:fs').readFileSync('packages/cli/package.json', 'utf8')).version")"
+          [[ "$VERSION" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]
+          test "$VERSION" = "$CLI_VERSION"
+          test "$(git rev-parse HEAD)" = "$RELEASE_REF"
+          test "$(npm view "@s11t/runtime@$VERSION" version)" = "$VERSION"
+          test "$(npm view "@s11t/cli@$VERSION" version)" = "$VERSION"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+      - name: Create the immutable tag and GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_REF: ${{ inputs.ref }}
+          VERSION: ${{ steps.release.outputs.version }}
+        run: |
+          TAG="v$VERSION"
+          git fetch --tags origin
+          if git show-ref --verify --quiet "refs/tags/$TAG"; then
+            test "$(git cat-file -t "$TAG")" = "tag"
+            test "$(git rev-list -n 1 "$TAG")" = "$RELEASE_REF"
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git tag --annotate "$TAG" "$RELEASE_REF" --message "S11t $VERSION"
+            git push origin "refs/tags/$TAG"
+          fi
+          if ! gh release view "$TAG" >/dev/null 2>&1; then
+            gh release create "$TAG" \
+              --verify-tag \
+              --target "$RELEASE_REF" \
+              --title "S11t $VERSION" \
+              --generate-notes
+          fi

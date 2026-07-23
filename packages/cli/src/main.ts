@@ -9,8 +9,8 @@ export const HELP = `s11t - SystemContext authoring and build tools
 Usage:
   s11t lint [--config s11t.config.toml] [--release-profile name] [--format human|json]
   s11t build [--config s11t.config.toml] [--release-profile name] [--check] [--format human|json]
-  s11t inspect <key> [--resolved] [--locale ja-JP] [--release-profile name] [--config s11t.config.toml]
-  s11t migrate authoring-v2 [--write] [--config s11t.config.toml] [--format human|json]
+  s11t inspect <key> [--resolved] [--locale ja-JP] [--release-profile name] [--config s11t.config.toml] [--format human|json]
+  s11t migrate authoring-v2 [--write | --restore operation-id] [--config s11t.config.toml] [--format human|json]
   s11t --help
 `;
 
@@ -45,6 +45,34 @@ function formatDiagnostic(diagnostic: S11tDiagnostic): string {
 			: `${diagnostic.file}:${diagnostic.line}${diagnostic.column === undefined ? "" : `:${diagnostic.column}`}`;
 	const path = diagnostic.path.length === 0 ? "" : ` [${diagnostic.path.join(".")}]`;
 	return `${location}: ${diagnostic.severity} ${diagnostic.code}${path}: ${diagnostic.message}`;
+}
+
+function formatInspectValue(value: unknown, indentation = 0): string[] {
+	const prefix = "\t".repeat(indentation);
+	if (value === null || typeof value !== "object") return [`${prefix}${String(value)}`];
+	if (Array.isArray(value)) {
+		if (value.length === 0) return [`${prefix}[]`];
+		if (value.every((item) => item === null || typeof item !== "object")) {
+			return [`${prefix}[${value.map((item) => JSON.stringify(item)).join(", ")}]`];
+		}
+		return value.flatMap((item, index) => [
+			`${prefix}${index}:`,
+			...formatInspectValue(item, indentation + 1),
+		]);
+	}
+	const entries = Object.entries(value as Record<string, unknown>);
+	if (entries.length === 0) return [`${prefix}{}`];
+	return entries.flatMap(([key, item]) => {
+		if (item === null || typeof item !== "object") return [`${prefix}${key}: ${String(item)}`];
+		if (Array.isArray(item) && item.every((entry) => entry === null || typeof entry !== "object")) {
+			return [`${prefix}${key}: [${item.map((entry) => JSON.stringify(entry)).join(", ")}]`];
+		}
+		return [`${prefix}${key}:`, ...formatInspectValue(item, indentation + 1)];
+	});
+}
+
+function formatInspectHuman(value: unknown): string {
+	return `${formatInspectValue(value).join("\n")}\n`;
 }
 
 export function runCli(
@@ -103,18 +131,15 @@ export function runCli(
 			const key = arguments_.shift();
 			if (key === undefined) throw new CliUsageError("inspect requires a context key");
 			if (arguments_.length > 0) throw new CliUsageError(`Unknown argument: ${arguments_[0]}`);
+			const result = inspectContext(key, {
+				...(config === undefined ? {} : { config }),
+				...(locale === undefined ? {} : { locale }),
+				...(releaseProfile === undefined ? {} : { releaseProfile }),
+				resolved,
+				cwd: io.cwd,
+			});
 			io.stdout(
-				`${JSON.stringify(
-					inspectContext(key, {
-						...(config === undefined ? {} : { config }),
-						...(locale === undefined ? {} : { locale }),
-						...(releaseProfile === undefined ? {} : { releaseProfile }),
-						resolved,
-						cwd: io.cwd,
-					}),
-					null,
-					2,
-				)}\n`,
+				format === "json" ? `${JSON.stringify(result, null, 2)}\n` : formatInspectHuman(result),
 			);
 			return 0;
 		}
@@ -122,17 +147,26 @@ export function runCli(
 			const target = arguments_.shift();
 			if (target !== "authoring-v2") throw new CliUsageError("migrate requires authoring-v2");
 			const write = takeFlag(arguments_, "--write");
-			if (releaseProfile !== undefined) throw new CliUsageError("migrate does not accept --release-profile");
+			const restore = takeOption(arguments_, "--restore");
+			if (write && restore !== undefined) {
+				throw new CliUsageError("migrate accepts either --write or --restore, not both");
+			}
+			if (releaseProfile !== undefined) {
+				throw new CliUsageError("migrate does not accept --release-profile");
+			}
 			if (arguments_.length > 0) throw new CliUsageError(`Unknown argument: ${arguments_[0]}`);
 			const result = migrateAuthoringV2({
 				...(config === undefined ? {} : { config }),
 				cwd: io.cwd,
 				write,
+				...(restore === undefined ? {} : { restore }),
 			});
 			io.stdout(
 				format === "json"
 					? `${JSON.stringify({ ok: true, ...result })}\n`
-					: `${write ? "Migrated" : "Would migrate"} ${result.contexts} context(s), ${result.profiles} profile(s), and ${result.aliases} alias(es).\n`,
+					: result.restored
+						? `Restored migration ${result.operationId} (${result.contexts} context(s)).\n`
+						: `${write ? `Migrated as ${result.operationId}` : "Would migrate"} ${result.contexts} context(s), ${result.profiles} profile(s), and ${result.aliases} alias(es).\n`,
 			);
 			return 0;
 		}
@@ -143,6 +177,15 @@ export function runCli(
 			return 2;
 		}
 		if (error instanceof S11tDiagnosticError) {
+			const usageDiagnostic = error.diagnostics.find((diagnostic) =>
+				["S11T_RELEASE_PROFILE_REQUIRED", "S11T_RELEASE_PROFILE_UNSUPPORTED"].includes(
+					diagnostic.code,
+				),
+			);
+			if (usageDiagnostic !== undefined) {
+				io.stderr(`${usageDiagnostic.message}\n\n${HELP}`);
+				return 2;
+			}
 			io.stderr(
 				format === "json"
 					? `${JSON.stringify(error.diagnostics)}\n`

@@ -1,0 +1,10 @@
+{
+  "definitionHash": "sha256:d9a53b0ffc8db732dfd2b60815948ef4a9b6d79b218ded524790dca9f573f460",
+  "artifactHashes": {
+    "en-US": "sha256:e76e92a567d831e8f49dfa0fa63d0a9d5ae44d95b45a7e57e27d29bface328c6",
+    "ja-JP": "sha256:f877b058e345f78a8e06bbba8c4c9dbb2b36ac1828085f52799a40b3975801c5"
+  },
+  "releaseDigest": "sha256:bb3dab2afc27353b2613fc7b7ee06ac430a806a99f9b706b1de8e6cbac21a403",
+  "policyDigest": "sha256:5d518a97a048993134a6eb58af375a7fb820338fcd8be291a70b7df472e897fc",
+  "catalogDigest": "sha256:c3fc2e75526347b386712a947b3c2ccb4a5cc9d78cf608575da55858992fb6ef"
+}

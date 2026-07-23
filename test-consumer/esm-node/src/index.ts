@@ -22,8 +22,14 @@ const invocationV2 = catalogV2.bind({
 const boundTextV2 = catalogV2.bindText({ instructionLocale: "ja-JP" });
 const textV2 = boundTextV2.p("consumer.identity", { taskGoal: "tarballを検証する" });
 const statusTextV2 = boundTextV2.byKey["consumer.status"]({});
-const liveTextV2 = catalogV2.createTextRenderer(() => ({ instructionLocale: "ja-JP" }));
-const liveStatusTextV2 = liveTextV2("consumer.status", {});
+let topLevelInstructionLocale = "ja-JP";
+const liveTextV2 = catalogV2.createTextRenderer(() => ({
+	instructionLocale: topLevelInstructionLocale,
+}));
+const liveStatusTextJaV2 = liveTextV2("consumer.status", {});
+topLevelInstructionLocale = "en-US";
+const liveStatusTextEnV2 = liveTextV2("consumer.status", {});
+const fixedStatusAfterLanguageChangeV2 = boundTextV2.byKey["consumer.status"]({});
 
 if (false) {
 	// @ts-expect-error missing required v2 value
@@ -35,5 +41,15 @@ if (false) {
 }
 
 process.stdout.write(
-	`${JSON.stringify({ invocation, invocationV2, textV2, statusTextV2, liveStatusTextV2, compilerVersion: COMPILER_VERSION, segments: tokenizeTemplate("[[value]]") })}\n`,
+	`${JSON.stringify({
+		invocation,
+		invocationV2,
+		textV2,
+		statusTextV2,
+		liveStatusTextJaV2,
+		liveStatusTextEnV2,
+		fixedStatusAfterLanguageChangeV2,
+		compilerVersion: COMPILER_VERSION,
+		segments: tokenizeTemplate("[[value]]"),
+	})}\n`,
 );
