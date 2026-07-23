@@ -106,6 +106,15 @@ describe("CLI", () => {
 		const operationId = JSON.parse(written.stdout).operationId as string;
 		expect(operationId).toMatch(/^authoring-v2-[0-9a-f]{24}$/);
 
+		const listed = execute(
+			["migrate", "authoring-v2", "--list", "--format", "json"],
+			directory,
+		);
+		expect(listed).toMatchObject({ code: 0, stderr: "" });
+		expect(JSON.parse(listed.stdout).operations).toEqual([
+			expect.objectContaining({ operationId, state: "committed" }),
+		]);
+
 		const restored = execute(
 			["migrate", "authoring-v2", "--restore", operationId, "--format", "json"],
 			directory,
@@ -113,6 +122,18 @@ describe("CLI", () => {
 		expect(restored).toMatchObject({ code: 0, stderr: "" });
 		expect(JSON.parse(restored.stdout)).toEqual(
 			expect.objectContaining({ restored: true, operationId }),
+		);
+
+		const purged = execute(
+			["migrate", "authoring-v2", "--purge", operationId, "--format", "json"],
+			directory,
+		);
+		expect(purged).toMatchObject({ code: 0, stderr: "" });
+		expect(JSON.parse(purged.stdout)).toEqual(
+			expect.objectContaining({
+				purged: true,
+				operation: expect.objectContaining({ operationId, state: "rolled-back" }),
+			}),
 		);
 	});
 

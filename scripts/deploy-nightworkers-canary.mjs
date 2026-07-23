@@ -1,4 +1,3 @@
-import { createHash } from "node:crypto";
 import {
 	cpSync,
 	existsSync,
@@ -14,6 +13,19 @@ import { tmpdir } from "node:os";
 import { basename, dirname, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import crossSpawn from "cross-spawn";
+
+import {
+	assertManagedFilesRestored,
+	backupManagedFiles,
+	checksum,
+	restoreManagedFiles,
+} from "./lib/nightworkers-deploy-state.mjs";
+
+export {
+	assertManagedFilesRestored,
+	backupManagedFiles,
+	restoreManagedFiles,
+} from "./lib/nightworkers-deploy-state.mjs";
 
 const { sync: spawnSync } = crossSpawn;
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -43,7 +55,7 @@ function parseArguments(values) {
 	return { target, verify };
 }
 
-function execute(command, arguments_, cwd, { capture = false, allowFailure = false } = {}) {
+function executeCommand(command, arguments_, cwd, { capture = false, allowFailure = false } = {}) {
 	const result = spawnSync(command, arguments_, {
 		cwd,
 		encoding: "utf8",
@@ -62,8 +74,8 @@ function execute(command, arguments_, cwd, { capture = false, allowFailure = fal
 	return result;
 }
 
-function captured(command, arguments_, cwd) {
-	return execute(command, arguments_, cwd, { capture: true }).stdout.trim();
+function capturedCommand(command, arguments_, cwd) {
+	return executeCommand(command, arguments_, cwd, { capture: true }).stdout.trim();
 }
 
 function readJson(path) {
@@ -72,10 +84,6 @@ function readJson(path) {
 
 function writeJson(path, value, indentation = 2) {
 	writeFileSync(path, `${JSON.stringify(value, null, indentation)}\n`, "utf8");
-}
-
-function checksum(path) {
-	return createHash("sha512").update(readFileSync(path)).digest("hex");
 }
 
 function assertNightWorkers(target) {
@@ -126,86 +134,6 @@ function validateManifest(path, commit) {
 	return { manifest, version };
 }
 
-function snapshotTree(root) {
-	if (!existsSync(root)) return [];
-	const result = [];
-	function visit(directory, prefix = "") {
-		for (const entry of readdirSync(directory, { withFileTypes: true }).sort((left, right) =>
-			left.name < right.name ? -1 : left.name > right.name ? 1 : 0,
-		)) {
-			const path = resolve(directory, entry.name);
-			const relativePath = prefix === "" ? entry.name : `${prefix}/${entry.name}`;
-			if (entry.isDirectory()) visit(path, relativePath);
-			else if (entry.isFile()) result.push({ path: relativePath, sha512: checksum(path) });
-			else throw new Error(`Unsupported managed file type: ${path}`);
-		}
-	}
-	visit(root);
-	return result;
-}
-
-export function backupManagedFiles(target, backupRoot) {
-	const files = ["package.json", "bun.lock"];
-	const vendorPath = resolve(target, "vendor/s11t");
-	const state = {
-		files: new Map(),
-		vendorExists: existsSync(vendorPath),
-		vendorSnapshot: snapshotTree(vendorPath),
-	};
-	for (const file of files) {
-		const source = resolve(target, file);
-		const present = existsSync(source);
-		state.files.set(file, {
-			present,
-			...(present ? { sha512: checksum(source) } : {}),
-		});
-		if (present) {
-			mkdirSync(resolve(backupRoot, dirname(file)), { recursive: true });
-			cpSync(source, resolve(backupRoot, file));
-		}
-	}
-	if (state.vendorExists) {
-		mkdirSync(resolve(backupRoot, "vendor"), { recursive: true });
-		cpSync(resolve(target, "vendor/s11t"), resolve(backupRoot, "vendor/s11t"), {
-			recursive: true,
-		});
-	}
-	return state;
-}
-
-export function assertManagedFilesRestored(target, state) {
-	for (const [file, expected] of state.files) {
-		const destination = resolve(target, file);
-		if (existsSync(destination) !== expected.present) {
-			throw new Error(`Rollback did not restore ${file} presence`);
-		}
-		if (expected.present && checksum(destination) !== expected.sha512) {
-			throw new Error(`Rollback did not restore ${file} bytes`);
-		}
-	}
-	const vendor = resolve(target, "vendor/s11t");
-	if (existsSync(vendor) !== state.vendorExists) {
-		throw new Error("Rollback did not restore vendor/s11t presence");
-	}
-	if (state.vendorExists) {
-		const actual = JSON.stringify(snapshotTree(vendor));
-		const expected = JSON.stringify(state.vendorSnapshot);
-		if (actual !== expected) throw new Error("Rollback did not restore vendor/s11t bytes");
-	}
-}
-
-export function restoreManagedFiles(target, backupRoot, state) {
-	for (const [file, expected] of state.files) {
-		const destination = resolve(target, file);
-		rmSync(destination, { force: true });
-		if (expected.present) cpSync(resolve(backupRoot, file), destination);
-	}
-	const vendor = resolve(target, "vendor/s11t");
-	rmSync(vendor, { recursive: true, force: true });
-	if (state.vendorExists) cpSync(resolve(backupRoot, "vendor/s11t"), vendor, { recursive: true });
-	assertManagedFilesRestored(target, state);
-}
-
 function installManifest(target, artifactDirectory, manifest, version, commit) {
 	const vendorDirectory = resolve(target, "vendor/s11t");
 	mkdirSync(vendorDirectory, { recursive: true });
@@ -250,9 +178,19 @@ being copied here. Keep the exact version pinned during dogfooding.
 	return { runtime, cli };
 }
 
-function verifyNightWorkers(target, runtime, cli, version, fullVerification) {
+function verifyNightWorkers(
+	target,
+	runtime,
+	cli,
+	version,
+	fullVerification,
+	execute,
+	checkpoint,
+) {
 	execute(bun, ["install", "--ignore-scripts"], target);
+	checkpoint("target-install");
 	execute(bun, ["install", "--frozen-lockfile", "--ignore-scripts"], target);
+	checkpoint("target-frozen-install");
 	for (const [entry, directory] of [
 		[runtime, "runtime"],
 		[cli, "cli"],
@@ -280,10 +218,14 @@ function verifyNightWorkers(target, runtime, cli, version, fullVerification) {
 		],
 		target,
 	);
+	checkpoint("target-runtime-import");
 	execute(bun, ["run", "s11t", "--help"], target);
+	checkpoint("target-cli-help");
 	if (fullVerification) {
 		execute(bun, ["run", "typecheck"], target);
+		checkpoint("target-typecheck");
 		execute(bun, ["run", "build"], target);
+		checkpoint("target-build");
 	}
 }
 
@@ -296,8 +238,14 @@ function pruneOldTarballs(target, keep) {
 	}
 }
 
-export function main(arguments_ = process.argv.slice(2)) {
-	const { target, verify } = parseArguments(arguments_);
+export function deployNightWorkers(
+	{ target, verify = false },
+	{
+		execute = executeCommand,
+		captured = capturedCommand,
+		checkpoint = () => {},
+	} = {},
+) {
 	assertNightWorkers(target);
 	const commit = captured("git", ["rev-parse", "HEAD"], repositoryRoot);
 	if (!/^[0-9a-f]{40}$/.test(commit)) throw new Error("S11t HEAD is not a full Git commit SHA");
@@ -318,13 +266,17 @@ export function main(arguments_ = process.argv.slice(2)) {
 	try {
 		execute("git", ["worktree", "add", "--detach", worktree, commit], repositoryRoot);
 		worktreeRegistered = true;
+		checkpoint("source-worktree");
 		execute(pnpm, ["install", "--frozen-lockfile", "--ignore-scripts"], worktree);
+		checkpoint("source-install");
 		execute(pnpm, ["version:canary"], worktree);
+		checkpoint("source-version");
 		execute(
 			pnpm,
 			["release:dry-run", "--", "--channel", "canary", "--allow-snapshot-changes"],
 			worktree,
 		);
+		checkpoint("source-release-dry-run");
 
 		const artifactDirectory = resolve(worktree, ".artifacts/packages");
 		const { manifest, version } = validateManifest(
@@ -340,8 +292,10 @@ export function main(arguments_ = process.argv.slice(2)) {
 			version,
 			commit,
 		);
-		verifyNightWorkers(target, runtime, cli, version, verify);
+		checkpoint("target-manifest-installed");
+		verifyNightWorkers(target, runtime, cli, version, verify, execute, checkpoint);
 		pruneOldTarballs(target, new Set([runtime.file, cli.file]));
+		checkpoint("target-pruned");
 		process.stdout.write(
 			`Deployed S11t ${version} from ${commit} to ${relative(dirname(target), target)}.\n`,
 		);
@@ -349,7 +303,9 @@ export function main(arguments_ = process.argv.slice(2)) {
 		if (targetMutated && backupState !== undefined) {
 			process.stderr.write("Deployment failed; restoring NightWorkers package files.\n");
 			try {
+				checkpoint("rollback-start");
 				restoreManagedFiles(target, backupRoot, backupState);
+				checkpoint("rollback-files-restored");
 				const bunLockState = backupState.files.get("bun.lock");
 				if (bunLockState?.present === true) {
 					execute(bun, ["install", "--frozen-lockfile", "--ignore-scripts"], target);
@@ -357,6 +313,7 @@ export function main(arguments_ = process.argv.slice(2)) {
 					execute(bun, ["install", "--ignore-scripts"], target);
 					rmSync(resolve(target, "bun.lock"), { force: true });
 				}
+				checkpoint("rollback-install");
 				assertManagedFilesRestored(target, backupState);
 			} catch (rollbackError) {
 				throw new AggregateError(
@@ -374,6 +331,10 @@ export function main(arguments_ = process.argv.slice(2)) {
 		}
 		rmSync(temporaryRoot, { recursive: true, force: true });
 	}
+}
+
+export function main(arguments_ = process.argv.slice(2)) {
+	return deployNightWorkers(parseArguments(arguments_));
 }
 
 if (process.argv[1] !== undefined && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) main();

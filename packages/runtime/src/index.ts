@@ -7,15 +7,20 @@ export {
 export { createCatalog } from "./catalog.js";
 export { assertCatalogIntegrityV2, createCatalogV2 } from "./catalog-v2.js";
 export type {
+	BoundRequestCatalog,
 	BoundTextCatalog,
 	CatalogBindingV2,
 	CatalogBindingResolverV2,
 	CatalogV2,
+	RequestAuditV2,
+	RequestRenderTraceEntryV2,
 	SystemContextDescriptionV2,
 	SystemContextInvocationV2,
 	TextRenderer,
 	TextRendererObject,
 } from "./catalog-v2.js";
+export { hashRendered, verifyRenderedHash } from "./hash.js";
+export type { S11tDigest } from "./hash.js";
 export type {
 	Catalog,
 	CatalogBinding,

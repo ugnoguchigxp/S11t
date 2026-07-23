@@ -47,6 +47,21 @@ npx s11t migrate authoring-v2 \
 ```
 
 Restore refuses to overwrite a file that differs from both the pre-migration and migrated checksums.
+Migration and restore preserve each source file's original POSIX permission bits. The journal directory
+contains a managed `.gitignore`, so source-bearing backups are not added to Git. Config, source,
+manifest, and backup symlinks are refused rather than replaced or followed during mutation.
+
+List retained operations and remove a completed journal after review:
+
+```sh
+npx s11t migrate authoring-v2 --config s11t.config.toml --list
+npx s11t migrate authoring-v2 \
+  --config s11t.config.toml \
+  --purge authoring-v2-<operation-id>
+```
+
+Purge refuses a `prepared` operation because it may be the only durable route back to the original
+files. Restore it first. Journals are never deleted automatically.
 
 The migration keeps legacy colon keys in `key_aliases`, allowing a staged caller migration. New code
 should use the generated canonical dot keys.
@@ -91,4 +106,5 @@ manifest. Use `bindText()` only for text composition that shares one fixed snaps
 6. Remove a legacy alias only after deployed callers no longer emit it.
 
 The durable operation backup handles immediate migration rollback; version control remains the
-longer-lived rollback and review mechanism. Keep the v1-to-v2 conversion in an isolated commit.
+longer-lived rollback and review mechanism. Keep the v1-to-v2 conversion in an isolated commit, then
+purge the completed journal when the version-controlled result has been reviewed.

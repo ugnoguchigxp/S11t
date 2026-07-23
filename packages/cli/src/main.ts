@@ -2,7 +2,11 @@ import { buildProject } from "./build-command.js";
 import { S11tDiagnosticError, type S11tDiagnostic } from "./diagnostics.js";
 import { inspectContext } from "./inspect-command.js";
 import { lintProject } from "./lint-command.js";
-import { migrateAuthoringV2 } from "./migrate-command.js";
+import {
+	listAuthoringV2Migrations,
+	migrateAuthoringV2,
+	purgeAuthoringV2Migration,
+} from "./migrate-command.js";
 
 export const HELP = `s11t - SystemContext authoring and build tools
 
@@ -10,7 +14,7 @@ Usage:
   s11t lint [--config s11t.config.toml] [--release-profile name] [--format human|json]
   s11t build [--config s11t.config.toml] [--release-profile name] [--check] [--format human|json]
   s11t inspect <key> [--resolved] [--locale ja-JP] [--release-profile name] [--config s11t.config.toml] [--format human|json]
-  s11t migrate authoring-v2 [--write | --restore operation-id] [--config s11t.config.toml] [--format human|json]
+  s11t migrate authoring-v2 [--write | --restore operation-id | --list | --purge operation-id] [--config s11t.config.toml] [--format human|json]
   s11t --help
 `;
 
@@ -148,13 +152,49 @@ export function runCli(
 			if (target !== "authoring-v2") throw new CliUsageError("migrate requires authoring-v2");
 			const write = takeFlag(arguments_, "--write");
 			const restore = takeOption(arguments_, "--restore");
-			if (write && restore !== undefined) {
-				throw new CliUsageError("migrate accepts either --write or --restore, not both");
+			const list = takeFlag(arguments_, "--list");
+			const purge = takeOption(arguments_, "--purge");
+			const actions = [write, restore !== undefined, list, purge !== undefined].filter(Boolean);
+			if (actions.length > 1) {
+				throw new CliUsageError(
+					"migrate accepts only one of --write, --restore, --list, or --purge",
+				);
 			}
 			if (releaseProfile !== undefined) {
 				throw new CliUsageError("migrate does not accept --release-profile");
 			}
 			if (arguments_.length > 0) throw new CliUsageError(`Unknown argument: ${arguments_[0]}`);
+			if (list) {
+				const result = listAuthoringV2Migrations({
+					...(config === undefined ? {} : { config }),
+					cwd: io.cwd,
+				});
+				io.stdout(
+					format === "json"
+						? `${JSON.stringify({ ok: true, ...result })}\n`
+						: result.operations.length === 0
+							? "No migration operations.\n"
+							: `${result.operations
+									.map(
+										(operation) =>
+											`${operation.operationId}\t${operation.state}\t${operation.createdAt ?? "unknown"}`,
+									)
+									.join("\n")}\n`,
+				);
+				return 0;
+			}
+			if (purge !== undefined) {
+				const result = purgeAuthoringV2Migration(purge, {
+					...(config === undefined ? {} : { config }),
+					cwd: io.cwd,
+				});
+				io.stdout(
+					format === "json"
+						? `${JSON.stringify({ ok: true, ...result })}\n`
+						: `Purged migration ${result.operation.operationId} (${result.operation.state}).\n`,
+				);
+				return 0;
+			}
 			const result = migrateAuthoringV2({
 				...(config === undefined ? {} : { config }),
 				cwd: io.cwd,

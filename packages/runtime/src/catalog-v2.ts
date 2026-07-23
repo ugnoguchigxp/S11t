@@ -1,4 +1,13 @@
 import { assertCatalogArtifactV2 } from "./artifact-schema.js";
+import {
+	cloneJson,
+	compareCodeUnits,
+	deepFreeze,
+	digestMismatch,
+	renderSection,
+	templateFromSegments,
+	valuesRecord,
+} from "./catalog-shared.js";
 import type {
 	CanonicalContextDefinitionV2,
 	CanonicalSectionDefinitionV2,
@@ -18,8 +27,6 @@ import type {
 	JsonValue,
 	S11tCatalogArtifactV2,
 	S11tCompiledContextV2,
-	S11tCompiledSectionV2,
-	TemplateSegment,
 } from "./types.js";
 
 type DefaultContract = CatalogContract<
@@ -47,6 +54,32 @@ export type TextRendererObject<C extends DefaultContract = DefaultContract> = {
 export type BoundTextCatalog<C extends DefaultContract = DefaultContract> = {
 	readonly p: TextRenderer<C>;
 	readonly byKey: TextRendererObject<C>;
+};
+
+export type RequestRenderTraceEntryV2 = {
+	readonly index: number;
+	readonly via: "p" | "byKey" | "invoke";
+	readonly manifest: SystemContextInvocationV2["manifest"];
+};
+
+export type RequestAuditV2 = {
+	readonly binding: Readonly<Required<CatalogBindingV2>>;
+	readonly finalManifest: SystemContextInvocationV2["manifest"];
+	/**
+	 * Successful renders performed by this request in call order.
+	 *
+	 * This is a render trace, not proof that every returned text was included
+	 * byte-for-byte in the final provider prompt.
+	 */
+	readonly renderTrace: readonly RequestRenderTraceEntryV2[];
+};
+
+export type BoundRequestCatalog<C extends DefaultContract = DefaultContract> = {
+	readonly binding: Readonly<Required<CatalogBindingV2>>;
+	readonly p: TextRenderer<C>;
+	readonly byKey: TextRendererObject<C>;
+	readonly invoke: ReturnType<CatalogV2<C>["bind"]>;
+	finalize<K extends ContractKey<C>>(finalInvocation: SystemContextInvocationV2<K>): RequestAuditV2;
 };
 
 export type CatalogBindingResolverV2 = () => CatalogBindingV2;
@@ -100,24 +133,11 @@ export type CatalogV2<C extends DefaultContract = DefaultContract> = {
 		values: ContractValues<C>[K],
 	) => SystemContextInvocationV2<K>;
 	bindText(binding: CatalogBindingV2): BoundTextCatalog<C>;
+	bindRequest(binding: CatalogBindingV2): BoundRequestCatalog<C>;
 	createTextRenderer(resolveBinding: CatalogBindingResolverV2): TextRenderer<C>;
 };
 
 const LOCALE_PATTERN = /^[A-Za-z]{2,8}(?:-[A-Za-z0-9]{1,8})*$/;
-
-function compareCodeUnits(left: string, right: string): number {
-	return left < right ? -1 : left > right ? 1 : 0;
-}
-
-function digestMismatch(path: Array<string | number>, label: string): never {
-	throw new S11tError("S11T_ARTIFACT_DIGEST_MISMATCH", `${label} digest mismatch`, path);
-}
-
-function templateFromSegments(segments: TemplateSegment[]): string {
-	return segments
-		.map((segment) => (segment.type === "literal" ? segment.value : `[[${segment.name}]]`))
-		.join("");
-}
 
 function definitionFromCompiled(context: S11tCompiledContextV2): CanonicalContextDefinitionV2 {
 	const availableLocales = Object.keys(context.locales).sort(compareCodeUnits);
@@ -300,48 +320,6 @@ export function assertCatalogIntegrityV2(artifact: S11tCatalogArtifactV2): void 
 	if (artifact.catalogDigest !== expectedCatalog) digestMismatch(["catalogDigest"], "Catalog");
 }
 
-function cloneJson<T extends JsonValue>(value: T): T {
-	if (value === null || typeof value !== "object") return value;
-	if (Array.isArray(value)) return value.map((item) => cloneJson(item)) as T;
-	return Object.fromEntries(
-		Object.entries(value).map(([key, item]) => [key, cloneJson(item)]),
-	) as T;
-}
-
-function deepFreeze<T>(value: T): T {
-	if (value !== null && typeof value === "object" && !Object.isFrozen(value)) {
-		Object.freeze(value);
-		for (const item of Object.values(value)) deepFreeze(item);
-	}
-	return value;
-}
-
-function valuesRecord(value: unknown): Record<string, unknown> {
-	if (value === null || typeof value !== "object" || Array.isArray(value)) {
-		throw new S11tError("S11T_VALUE_INVALID", "Values must be an object", []);
-	}
-	const prototype = Object.getPrototypeOf(value) as unknown;
-	if (prototype !== Object.prototype && prototype !== null) {
-		throw new S11tError("S11T_VALUE_INVALID", "Values must be a plain object", []);
-	}
-	return value as Record<string, unknown>;
-}
-
-function renderSection(
-	section: S11tCompiledSectionV2,
-	encodedValues: Record<string, string>,
-): string {
-	return section.segments
-		.map((segment) => {
-			if (segment.type === "literal") return segment.value;
-			if (!Object.hasOwn(encodedValues, segment.name)) {
-				throw new S11tError("S11T_ARTIFACT_INVALID", "Variable segment is undeclared", [segment.name]);
-			}
-			return encodedValues[segment.name]!;
-		})
-		.join("");
-}
-
 function validateBinding(binding: CatalogBindingV2): CatalogBindingV2 {
 	if (!LOCALE_PATTERN.test(binding.instructionLocale)) {
 		throw new S11tError("S11T_VALUE_INVALID", "instructionLocale is invalid", ["instructionLocale"]);
@@ -502,6 +480,84 @@ export function createCatalogV2<C extends DefaultContract = DefaultContract>(
 			byKey: Object.freeze(renderers) as unknown as TextRendererObject<C>,
 		});
 	};
+	const bindRequest = (binding: CatalogBindingV2): BoundRequestCatalog<C> => {
+		const snapshot = deepFreeze(validateBinding(binding)) as Readonly<
+			Required<CatalogBindingV2>
+		>;
+		const trace: RequestRenderTraceEntryV2[] = [];
+		const requestInvocations = new WeakSet<object>();
+		let lastInvocation: SystemContextInvocationV2 | undefined;
+		let finalized = false;
+		const assertOpen = (): void => {
+			if (finalized) {
+				throw new S11tError("S11T_VALUE_INVALID", "Request binding is already finalized", [
+					"request",
+				]);
+			}
+		};
+		const trackedInvoke = (
+			via: RequestRenderTraceEntryV2["via"],
+			key: string,
+			values: RuntimeValues,
+		): SystemContextInvocationV2 => {
+			assertOpen();
+			const invocation = invoke(artifact, key, values, snapshot);
+			requestInvocations.add(invocation);
+			lastInvocation = invocation;
+			trace.push(
+				deepFreeze({
+					index: trace.length,
+					via,
+					manifest: invocation.manifest,
+				}),
+			);
+			return invocation;
+		};
+		const requestP = Object.freeze(((key: string, values: RuntimeValues) =>
+			trackedInvoke("p", key, values).content.text) as TextRenderer<C>);
+		const requestByKey = Object.create(null) as Record<
+			string,
+			(values: RuntimeValues) => string
+		>;
+		for (const key of textKeys) {
+			const render = Object.freeze((values: RuntimeValues) =>
+				trackedInvoke("byKey", key, values).content.text,
+			);
+			Object.defineProperty(requestByKey, key, {
+				value: render,
+				enumerable: true,
+				writable: false,
+				configurable: false,
+			});
+		}
+		const requestInvoke = ((key: string, values: RuntimeValues) =>
+			trackedInvoke("invoke", key, values)) as ReturnType<CatalogV2<C>["bind"]>;
+		return Object.freeze({
+			binding: snapshot,
+			p: requestP,
+			byKey: Object.freeze(requestByKey) as unknown as TextRendererObject<C>,
+			invoke: Object.freeze(requestInvoke),
+			finalize: (finalInvocation) => {
+				assertOpen();
+				if (
+					!requestInvocations.has(finalInvocation) ||
+					lastInvocation !== finalInvocation
+				) {
+					throw new S11tError(
+						"S11T_VALUE_INVALID",
+						"Final invocation must be the latest invocation produced by this request",
+						["finalInvocation"],
+					);
+				}
+				finalized = true;
+				return deepFreeze({
+					binding: snapshot,
+					finalManifest: finalInvocation.manifest,
+					renderTrace: [...trace],
+				});
+			},
+		});
+	};
 	return {
 		catalogDigest: artifact.catalogDigest,
 		releaseProfile: artifact.releaseProfile,
@@ -522,6 +578,7 @@ export function createCatalogV2<C extends DefaultContract = DefaultContract>(
 		listAliases: () => aliases,
 		bind,
 		bindText,
+		bindRequest,
 		createTextRenderer: (resolveBinding) =>
 			Object.freeze(((key: string, values: RuntimeValues) => {
 				const bound = bind(resolveBinding());

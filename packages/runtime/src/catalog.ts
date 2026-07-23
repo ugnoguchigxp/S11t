@@ -1,5 +1,14 @@
 import { assertCatalogArtifactV1, isCatalogArtifactV2 } from "./artifact-schema.js";
 import { createCatalogV2 } from "./catalog-v2.js";
+import {
+	cloneJson,
+	compareCodeUnits,
+	deepFreeze,
+	digestMismatch,
+	renderSection,
+	templateFromSegments,
+	valuesRecord,
+} from "./catalog-shared.js";
 import type { CanonicalContextDefinition, CanonicalSectionDefinition } from "./canonical-definition.js";
 import { S11tError } from "./diagnostics.js";
 import { encodeValue } from "./encoding.js";
@@ -14,8 +23,6 @@ import type {
 	JsonValue,
 	S11tCatalogArtifactV1,
 	S11tCompiledContextV1,
-	S11tCompiledSectionV1,
-	TemplateSegment,
 } from "./types.js";
 
 export type RuntimeValues = Record<string, unknown>;
@@ -86,20 +93,6 @@ export type Catalog<C extends DefaultContract = DefaultContract> = {
 		values: ContractValues<C>[K],
 	) => SystemContextInvocation<K>;
 };
-
-function compareCodeUnits(left: string, right: string): number {
-	return left < right ? -1 : left > right ? 1 : 0;
-}
-
-function digestMismatch(path: Array<string | number>, label: string): never {
-	throw new S11tError("S11T_ARTIFACT_DIGEST_MISMATCH", `${label} digest mismatch`, path);
-}
-
-function templateFromSegments(segments: TemplateSegment[]): string {
-	return segments
-		.map((segment) => (segment.type === "literal" ? segment.value : `[[${segment.name}]]`))
-		.join("");
-}
 
 function definitionFromCompiled(context: S11tCompiledContextV1): CanonicalContextDefinition {
 	const availableLocales = Object.keys(context.locales).sort(compareCodeUnits);
@@ -280,48 +273,6 @@ function verifyDigests(artifact: S11tCatalogArtifactV1): void {
 	if (artifact.catalogDigest !== expectedCatalog) {
 		digestMismatch(["catalogDigest"], "Catalog");
 	}
-}
-
-function cloneJson<T extends JsonValue>(value: T): T {
-	if (value === null || typeof value !== "object") return value;
-	if (Array.isArray(value)) return value.map((item) => cloneJson(item)) as T;
-	return Object.fromEntries(
-		Object.entries(value).map(([key, item]) => [key, cloneJson(item)]),
-	) as T;
-}
-
-function deepFreeze<T>(value: T): T {
-	if (value !== null && typeof value === "object" && !Object.isFrozen(value)) {
-		Object.freeze(value);
-		for (const item of Object.values(value)) deepFreeze(item);
-	}
-	return value;
-}
-
-function valuesRecord(value: unknown): Record<string, unknown> {
-	if (value === null || typeof value !== "object" || Array.isArray(value)) {
-		throw new S11tError("S11T_VALUE_INVALID", "Values must be an object", []);
-	}
-	const prototype = Object.getPrototypeOf(value) as unknown;
-	if (prototype !== Object.prototype && prototype !== null) {
-		throw new S11tError("S11T_VALUE_INVALID", "Values must be a plain object", []);
-	}
-	return value as Record<string, unknown>;
-}
-
-function renderSection(
-	section: S11tCompiledSectionV1,
-	encodedValues: Record<string, string>,
-): string {
-	return section.segments
-		.map((segment) => {
-			if (segment.type === "literal") return segment.value;
-			if (!Object.hasOwn(encodedValues, segment.name)) {
-				throw new S11tError("S11T_ARTIFACT_INVALID", "Variable segment is undeclared", [segment.name]);
-			}
-			return encodedValues[segment.name]!;
-		})
-		.join("");
 }
 
 function invoke(

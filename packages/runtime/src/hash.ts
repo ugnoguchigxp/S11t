@@ -94,3 +94,7 @@ export function hashCatalog(value: CatalogIdentityInput): S11tDigest {
 export function hashRendered(text: string): S11tDigest {
 	return sha256Utf8(`${HASH_DOMAINS.rendered}\0${text}`);
 }
+
+export function verifyRenderedHash(text: string, digest: string): boolean {
+	return hashRendered(text) === digest;
+}

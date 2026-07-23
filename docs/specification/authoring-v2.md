@@ -83,6 +83,8 @@ s11t inspect structuredGeneration.repair --resolved --release-profile developmen
 s11t migrate authoring-v2 --config s11t.config.toml
 s11t migrate authoring-v2 --config s11t.config.toml --write
 s11t migrate authoring-v2 --config s11t.config.toml --restore authoring-v2-<operation-id>
+s11t migrate authoring-v2 --config s11t.config.toml --list
+s11t migrate authoring-v2 --config s11t.config.toml --purge authoring-v2-<operation-id>
 ```
 
 Dry-run is the default. The write form generates project-level owner, locale, release, variable-profile,
@@ -94,4 +96,7 @@ release profile is rejected explicitly.
 Before the first replacement, the write form stores original bytes, before/after SHA-256 digests, and a
 manifest under `.s11t/migrations/<operation-id>/`. A prepared operation blocks another write until it is
 restored. Restore verifies backup checksums and refuses to overwrite a target whose bytes match neither
-the recorded before nor after state.
+the recorded before nor after state. Write and restore preserve the recorded POSIX permission bits. The
+journal root contains a managed `.gitignore`. List exposes retained operation states; purge accepts only
+`committed` or `rolled-back` operations and never performs automatic retention cleanup. Mutation refuses
+symbolic links for config, source, manifest, and backup files.

@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { createCatalogV2, S11tError } from "../src/index.js";
+import {
+	createCatalogV2,
+	hashRendered,
+	S11tError,
+	verifyRenderedHash,
+} from "../src/index.js";
 import { compileCatalogV2, type CanonicalContextDefinitionV2 } from "../src/compiler.js";
 
 function definition(): CanonicalContextDefinitionV2 {
@@ -60,6 +65,22 @@ function japaneseOnlyArtifact() {
 	});
 }
 
+function compoundArtifact() {
+	const provider = definitionWithValue();
+	provider.key = "codingAgent.provider-prompt";
+	provider.sections[0]!.locales = {
+		"ja-JP": "Provider: [[value]]",
+		"en-US": "Provider: [[value]]",
+	};
+	return compileCatalogV2([definition(), provider], {
+		releaseProfile: "production",
+		provenance: {
+			configPath: "s11t.config.toml",
+			sourceFiles: ["contexts/role.context.toml", "contexts/provider.context.toml"],
+		},
+	});
+}
+
 function errorCode(action: () => unknown): string {
 	try {
 		action();
@@ -98,6 +119,21 @@ describe("catalog v2", () => {
 		expect(catalog.listAliases()).toEqual({
 			"codingAgent:roleInstructions": "codingAgent.role-instructions",
 		});
+	});
+
+	it("lists and describes immutable contexts through canonical keys and aliases", () => {
+		const catalog = createCatalogV2(artifact());
+		const descriptions = catalog.list();
+		expect(descriptions).toEqual([
+			expect.objectContaining({
+				key: "codingAgent.role-instructions",
+				availableLocales: ["en-US", "ja-JP"],
+			}),
+		]);
+		expect(catalog.describe("codingAgent.role-instructions")).toBe(descriptions[0]);
+		expect(catalog.describe("codingAgent:roleInstructions")).toBe(descriptions[0]);
+		expect(Object.isFrozen(descriptions)).toBe(true);
+		expect(errorCode(() => catalog.describe("missing.context"))).toBe("S11T_CONTEXT_NOT_FOUND");
 	});
 
 	it("keeps language switching at the top-level binding and snapshots language variables", () => {
@@ -172,6 +208,70 @@ describe("catalog v2", () => {
 		fallbackLocales.length = 0;
 
 		expect(bound.p("codingAgent.role-instructions", {})).toBe("日本語\n");
+	});
+
+	it("binds text and invocations to one immutable request audit snapshot", () => {
+		const catalog = createCatalogV2(compoundArtifact());
+		const fallbackLocales = ["en-US"];
+		const request = catalog.bindRequest({
+			instructionLocale: "ja-JP",
+			fallbackLocales,
+		});
+		fallbackLocales.length = 0;
+
+		const role = request.p("codingAgent.role-instructions", {});
+		expect(request.byKey["codingAgent.role-instructions"]({})).toBe(role);
+		const final = request.invoke("codingAgent.provider-prompt", {
+			value: role.trimEnd(),
+		});
+		const audit = request.finalize(final);
+
+		expect(audit.binding).toEqual({
+			instructionLocale: "ja-JP",
+			fallbackLocales: ["en-US"],
+		});
+		expect(audit.finalManifest).toBe(final.manifest);
+		expect(audit.renderTrace.map(({ index, via, manifest }) => ({
+			index,
+			via,
+			key: manifest.requestedKey,
+		}))).toEqual([
+			{ index: 0, via: "p", key: "codingAgent.role-instructions" },
+			{ index: 1, via: "byKey", key: "codingAgent.role-instructions" },
+			{ index: 2, via: "invoke", key: "codingAgent.provider-prompt" },
+		]);
+		expect(Object.isFrozen(request)).toBe(true);
+		expect(Object.isFrozen(request.binding)).toBe(true);
+		expect(Object.isFrozen(audit)).toBe(true);
+		expect(Object.isFrozen(audit.renderTrace)).toBe(true);
+		expect(Object.isFrozen(audit.renderTrace[0])).toBe(true);
+		expect(() => request.p("codingAgent.role-instructions", {})).toThrowError(
+			expect.objectContaining<S11tError>({ code: "S11T_VALUE_INVALID" }),
+		);
+	});
+
+	it("finalizes only the latest invocation from the same request", () => {
+		const catalog = createCatalogV2(compoundArtifact());
+		const first = catalog.bindRequest({ instructionLocale: "ja-JP" });
+		const second = catalog.bindRequest({ instructionLocale: "ja-JP" });
+		const firstInvocation = first.invoke("codingAgent.role-instructions", {});
+		const secondInvocation = second.invoke("codingAgent.role-instructions", {});
+
+		expect(() => first.finalize(secondInvocation)).toThrowError(
+			expect.objectContaining<S11tError>({ code: "S11T_VALUE_INVALID" }),
+		);
+		const later = first.invoke("codingAgent.role-instructions", {});
+		expect(() => first.finalize(firstInvocation)).toThrowError(
+			expect.objectContaining<S11tError>({ code: "S11T_VALUE_INVALID" }),
+		);
+		expect(first.finalize(later).finalManifest).toBe(later.manifest);
+	});
+
+	it("exports rendered hash helpers from the package root", () => {
+		const text = "Provider prompt\n";
+		const digest = hashRendered(text);
+		expect(verifyRenderedHash(text, digest)).toBe(true);
+		expect(verifyRenderedHash(`${text}changed`, digest)).toBe(false);
 	});
 
 	it("evaluates a live binding resolver exactly once per call and reflects language changes", () => {
