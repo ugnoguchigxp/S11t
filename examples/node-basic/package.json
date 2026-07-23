@@ -7,7 +7,7 @@
     "node": "^20.19.0 || ^22.0.0 || ^24.0.0"
   },
   "scripts": {
-    "build": "s11t build && tsc -b --pretty false",
+    "build": "s11t build --release-profile production && tsc -b --pretty false",
     "start": "node dist/src/index.js"
   },
   "dependencies": {

@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://s11t.dev/schemas/s11t-authoring-v2.schema.json",
-  "title": "S11t content-first TOML authoring document v2",
+  "$id": "https://s11t.dev/schemas/s11t-authoring.schema.json",
+  "title": "S11t content-first TOML authoring document",
   "type": "object",
   "additionalProperties": false,
   "properties": {
@@ -81,6 +81,10 @@
             {
               "if": { "properties": { "encoding": { "const": "json-string" } }, "required": ["encoding"] },
               "then": { "properties": { "type": { "enum": ["string", "number", "boolean"] } }, "required": ["type"] }
+            },
+            {
+              "if": { "properties": { "trust": { "const": "untrusted" } }, "required": ["trust"] },
+              "then": { "properties": { "placement": { "const": "delimited-context" } }, "required": ["placement"] }
             }
           ]
         }

@@ -1,5 +1,5 @@
 import { S11tDiagnosticError, type S11tDiagnostic } from "./diagnostics.js";
-import { compileProject, isCompiledProjectV2 } from "./compile-source.js";
+import { compileProject } from "./compile-source.js";
 import { loadProject } from "./discover.js";
 
 const LOCALE_PATTERN = /^[A-Za-z]{2,8}(?:-[A-Za-z0-9]{1,8})*$/;
@@ -78,14 +78,6 @@ export function inspectCoverage(options: {
 		options.releaseProfile,
 		{ validateRequiredCoverage: false },
 	);
-	if (!("releaseProfile" in project)) {
-		coverageDiagnostic(
-			"S11T_RELEASE_PROFILE_UNSUPPORTED",
-			"Locale coverage inspection requires config v2",
-			project.configPath,
-			[],
-		);
-	}
 	const direct: string[] = [];
 	const fallback: string[] = [];
 	const missing: string[] = [];
@@ -111,6 +103,10 @@ export function inspectCoverage(options: {
 		resolvedByLocale[resolvedFallback]!.push(key);
 	}
 	const requiredLocales = [...(project.documents[0]?.definition.requiredLocales ?? [])];
+	direct.sort();
+	fallback.sort();
+	missing.sort();
+	for (const keys of Object.values(resolvedByLocale)) keys.sort();
 	return {
 		schemaVersion: 1,
 		releaseProfile: project.releaseProfile,
@@ -136,68 +132,12 @@ export function inspectContext(
 	options: { config?: string; locale?: string; cwd?: string; releaseProfile?: string; resolved?: boolean } = {},
 ): unknown {
 	const project = compileProject(options.config, options.cwd, options.releaseProfile);
-	if (isCompiledProjectV2(project)) {
-		const resolvedKey = Object.hasOwn(project.artifact.contexts, key)
-			? key
-			: Object.hasOwn(project.artifact.aliases, key)
-				? project.artifact.aliases[key]
-				: undefined;
-		if (resolvedKey === undefined) {
-			const diagnostic: S11tDiagnostic = {
-				code: "S11T_CONTEXT_NOT_FOUND",
-				severity: "error",
-				message: `Context not found: ${key}`,
-				file: project.configPath,
-				path: [key],
-			};
-			throw new S11tDiagnosticError([diagnostic]);
-		}
-		const context = project.artifact.contexts[resolvedKey];
-		if (context === undefined) throw new Error(`Resolved context is missing: ${resolvedKey}`);
-		if (options.resolved === true) {
-			const document = project.documents.find((candidate) => candidate.definition.key === resolvedKey)!;
-			return {
-				key: context.key,
-				requestedKey: key,
-				aliasUsed: key !== resolvedKey,
-				owner: context.owner,
-				contentKind: context.contentKind,
-				sourceLocale: context.sourceLocale,
-				requiredLocales: context.requiredLocales,
-				availableLocales: Object.keys(context.locales).sort(),
-				variables: context.variables,
-				definitionHash: context.definitionHash,
-				releaseProfile: project.releaseProfile,
-				policyDigest: project.artifact.policyDigest,
-				origins: document.origins,
-			};
-		}
-		const locale = options.locale ?? context.sourceLocale;
-		const compiledLocale = context.locales[locale];
-		if (compiledLocale === undefined) {
-			const diagnostic: S11tDiagnostic = {
-				code: "S11T_LOCALE_NOT_FOUND",
-				severity: "error",
-				message: `Locale not found: ${locale}`,
-				file: project.configPath,
-				path: [resolvedKey, locale],
-			};
-			throw new S11tDiagnosticError([diagnostic]);
-		}
-		return {
-			key: context.key,
-			requestedKey: key,
-			owner: context.owner,
-			locale,
-			definitionHash: context.definitionHash,
-			artifactHash: compiledLocale.artifactHash,
-			releaseDigest: context.releaseDigest,
-			variables: context.variables,
-			sections: compiledLocale.sections,
-		};
-	}
-	const context = project.artifact.contexts[key];
-	if (context === undefined) {
+	const resolvedKey = Object.hasOwn(project.artifact.contexts, key)
+		? key
+		: Object.hasOwn(project.artifact.aliases, key)
+			? project.artifact.aliases[key]
+			: undefined;
+	if (resolvedKey === undefined) {
 		const diagnostic: S11tDiagnostic = {
 			code: "S11T_CONTEXT_NOT_FOUND",
 			severity: "error",
@@ -207,7 +147,27 @@ export function inspectContext(
 		};
 		throw new S11tDiagnosticError([diagnostic]);
 	}
-	const locale = options.locale ?? project.config.defaultLocale;
+	const context = project.artifact.contexts[resolvedKey];
+	if (context === undefined) throw new Error(`Resolved context is missing: ${resolvedKey}`);
+	if (options.resolved === true) {
+		const document = project.documents.find((candidate) => candidate.definition.key === resolvedKey)!;
+		return {
+			key: context.key,
+			requestedKey: key,
+			aliasUsed: key !== resolvedKey,
+			owner: context.owner,
+			contentKind: context.contentKind,
+			sourceLocale: context.sourceLocale,
+			requiredLocales: context.requiredLocales,
+			availableLocales: Object.keys(context.locales).sort(),
+			variables: context.variables,
+			definitionHash: context.definitionHash,
+			releaseProfile: project.releaseProfile,
+			policyDigest: project.artifact.policyDigest,
+			origins: document.origins,
+		};
+	}
+	const locale = options.locale ?? context.sourceLocale;
 	const compiledLocale = context.locales[locale];
 	if (compiledLocale === undefined) {
 		const diagnostic: S11tDiagnostic = {
@@ -215,13 +175,13 @@ export function inspectContext(
 			severity: "error",
 			message: `Locale not found: ${locale}`,
 			file: project.configPath,
-			path: [key, locale],
+			path: [resolvedKey, locale],
 		};
 		throw new S11tDiagnosticError([diagnostic]);
 	}
 	return {
-		id: context.id,
-		version: context.version,
+		key: context.key,
+		requestedKey: key,
 		owner: context.owner,
 		locale,
 		definitionHash: context.definitionHash,

@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "s11t build && tsc -p tsconfig.json --pretty false",
+    "build": "s11t build --release-profile development && tsc -p tsconfig.json --pretty false",
     "start": "node dist/src/index.js"
   },
   "devDependencies": {

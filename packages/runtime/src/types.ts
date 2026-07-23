@@ -15,7 +15,7 @@ export type S11tVariableTrust = "trusted" | "untrusted";
 export type S11tVariablePlacement = "inline" | "delimited-context";
 export type S11tVariableEncoding = "raw" | "json-string" | "json-value";
 
-export type S11tCompiledVariableV1 = {
+export type S11tCompiledVariable = {
 	required: true;
 	type: S11tVariableType;
 	trust: S11tVariableTrust;
@@ -33,7 +33,7 @@ export type S11tSectionKind =
 export type S11tSectionSeverity = "must" | "should" | "may";
 export type S11tSectionEnforcement = "prompt" | "schema" | "host";
 
-export type S11tCompiledSectionV1 = {
+export type S11tCompiledSection = {
 	id: string;
 	kind: S11tSectionKind;
 	severity: S11tSectionSeverity;
@@ -42,86 +42,37 @@ export type S11tCompiledSectionV1 = {
 	segments: TemplateSegment[];
 };
 
-export type S11tCompiledLocaleV1 = {
-	sections: S11tCompiledSectionV1[];
+export type S11tCompiledLocale = {
+	sections: S11tCompiledSection[];
 	artifactHash: string;
 };
 
-export type S11tCompiledContextV1 = {
-	id: string;
-	version: string;
-	owner: string;
-	output: "text";
-	sourceLocale: string;
-	requiredLocales: string[];
-	variables: Record<string, S11tCompiledVariableV1>;
-	locales: Record<string, S11tCompiledLocaleV1>;
-	definitionHash: string;
-	releaseDigest: string;
-};
-
-export type S11tCatalogArtifactV1 = {
-	format: "s11t.catalog";
-	schemaVersion: 1;
-	compilerVersion: string;
-	defaultLocale: string;
-	createdFrom: {
-		configPath: string;
-		sourceFiles: string[];
-	};
-	contexts: Record<string, S11tCompiledContextV1>;
-	catalogDigest: string;
-};
-
-export type S11tCompiledVariableV2 = S11tCompiledVariableV1;
-export type S11tCompiledSectionV2 = S11tCompiledSectionV1;
-export type S11tCompiledLocaleV2 = S11tCompiledLocaleV1;
-
-export type S11tCompiledContextV2 = {
+export type S11tCompiledContext = {
 	key: string;
 	owner: string;
 	contentKind: "text";
 	sourceLocale: string;
 	requiredLocales: string[];
-	variables: Record<string, S11tCompiledVariableV2>;
-	locales: Record<string, S11tCompiledLocaleV2>;
+	variables: Record<string, S11tCompiledVariable>;
+	locales: Record<string, S11tCompiledLocale>;
 	definitionHash: string;
 	releaseDigest: string;
 };
 
-export type S11tCatalogArtifactV2 = {
+export type S11tRenderingContract = "delimited-context";
+
+export type S11tCatalogArtifact = {
 	format: "s11t.catalog";
-	schemaVersion: 2;
+	schemaVersion: 1;
 	compilerVersion: string;
 	releaseProfile: string;
 	policyDigest: string;
+	renderingContract: S11tRenderingContract;
 	createdFrom: {
 		configPath: string;
 		sourceFiles: string[];
 	};
-	contexts: Record<string, S11tCompiledContextV2>;
-	aliases: Record<string, string>;
-	catalogDigest: string;
-};
-
-export type S11tRenderingContractV3 = "delimited-context-v1";
-export type S11tCompiledContextV3 = S11tCompiledContextV2;
-export type S11tCompiledLocaleV3 = S11tCompiledLocaleV2;
-export type S11tCompiledSectionV3 = S11tCompiledSectionV2;
-export type S11tCompiledVariableV3 = S11tCompiledVariableV2;
-
-export type S11tCatalogArtifactV3 = {
-	format: "s11t.catalog";
-	schemaVersion: 3;
-	compilerVersion: string;
-	releaseProfile: string;
-	policyDigest: string;
-	renderingContract: S11tRenderingContractV3;
-	createdFrom: {
-		configPath: string;
-		sourceFiles: string[];
-	};
-	contexts: Record<string, S11tCompiledContextV3>;
+	contexts: Record<string, S11tCompiledContext>;
 	aliases: Record<string, string>;
 	catalogDigest: string;
 };

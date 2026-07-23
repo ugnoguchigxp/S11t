@@ -1,9 +1,5 @@
 import { S11tError } from "./diagnostics.js";
-import type {
-	S11tCatalogArtifactV1,
-	S11tCatalogArtifactV2,
-	S11tCatalogArtifactV3,
-} from "./types.js";
+import type { S11tCatalogArtifact } from "./types.js";
 
 type Path = Array<string | number>;
 type UnknownRecord = Record<string, unknown>;
@@ -123,11 +119,7 @@ function nonEmptyUniqueStringArray(value: unknown, path: Path): string[] {
 	return result;
 }
 
-function validateVariable(
-	value: unknown,
-	path: Path,
-	requireDelimitedUntrusted = false,
-): void {
+function validateVariable(value: unknown, path: Path): void {
 	const object = record(value, path);
 	exactKeys(object, ["required", "type", "trust", "placement", "encoding"], path);
 	literal(object.required, true, [...path, "required"]);
@@ -138,11 +130,7 @@ function validateVariable(
 	if (object.trust === "untrusted" && object.encoding === "raw") {
 		fail([...path, "encoding"], "a non-raw encoding for untrusted data");
 	}
-	if (
-		requireDelimitedUntrusted &&
-		object.trust === "untrusted" &&
-		object.placement !== "delimited-context"
-	) {
+	if (object.trust === "untrusted" && object.placement !== "delimited-context") {
 		fail([...path, "placement"], "delimited-context placement for untrusted data");
 	}
 	if (object.encoding === "raw" && object.type !== "string") {
@@ -200,94 +188,9 @@ function validateLocale(value: unknown, path: Path, validateVariableNames = fals
 	digest(object.artifactHash, [...path, "artifactHash"]);
 }
 
-function validateContext(value: unknown, path: Path): void {
-	const object = record(value, path);
-	exactKeys(
-		object,
-		[
-			"id",
-			"version",
-			"owner",
-			"output",
-			"sourceLocale",
-			"requiredLocales",
-			"variables",
-			"locales",
-			"definitionHash",
-			"releaseDigest",
-		],
-		path,
-	);
-	nonEmptyString(object.id, [...path, "id"]);
-	nonEmptyString(object.version, [...path, "version"]);
-	nonEmptyString(object.owner, [...path, "owner"]);
-	literal(object.output, "text", [...path, "output"]);
-	nonEmptyString(object.sourceLocale, [...path, "sourceLocale"]);
-	nonEmptyUniqueStringArray(object.requiredLocales, [...path, "requiredLocales"]);
-	const variables = record(object.variables, [...path, "variables"]);
-	for (const [name, variable] of Object.entries(variables)) {
-		validateVariable(variable, [...path, "variables", name]);
-	}
-	const locales = record(object.locales, [...path, "locales"]);
-	if (Object.keys(locales).length === 0) fail([...path, "locales"], "a non-empty object");
-	for (const [locale, definition] of Object.entries(locales)) {
-		validateLocale(definition, [...path, "locales", locale]);
-	}
-	digest(object.definitionHash, [...path, "definitionHash"]);
-	digest(object.releaseDigest, [...path, "releaseDigest"]);
-}
-
-export function assertCatalogArtifactV1(value: unknown): asserts value is S11tCatalogArtifactV1 {
-	const object = record(value, []);
-	exactKeys(
-		object,
-		[
-			"format",
-			"schemaVersion",
-			"compilerVersion",
-			"defaultLocale",
-			"createdFrom",
-			"contexts",
-			"catalogDigest",
-		],
-		[],
-	);
-	literal(object.format, "s11t.catalog", ["format"]);
-	literal(object.schemaVersion, 1, ["schemaVersion"]);
-	nonEmptyString(object.compilerVersion, ["compilerVersion"]);
-	nonEmptyString(object.defaultLocale, ["defaultLocale"]);
-	const createdFrom = record(object.createdFrom, ["createdFrom"]);
-	exactKeys(createdFrom, ["configPath", "sourceFiles"], ["createdFrom"]);
-	relativePosixPath(createdFrom.configPath, ["createdFrom", "configPath"]);
-	const sourceFiles = stringArray(createdFrom.sourceFiles, ["createdFrom", "sourceFiles"]);
-	sourceFiles.forEach((sourceFile, index) =>
-		relativePosixPath(sourceFile, ["createdFrom", "sourceFiles", index]),
-	);
-	const contexts = record(object.contexts, ["contexts"]);
-	for (const [key, context] of Object.entries(contexts)) {
-		validateContext(context, ["contexts", key]);
-	}
-	digest(object.catalogDigest, ["catalogDigest"]);
-}
-
-export function isCatalogArtifactV1(value: unknown): value is S11tCatalogArtifactV1 {
-	try {
-		assertCatalogArtifactV1(value);
-		return true;
-	} catch (error) {
-		if (error instanceof S11tError) return false;
-		throw error;
-	}
-}
-
 const DOT_KEY_PATTERN = /^[A-Za-z][A-Za-z0-9_-]*(?:\.[A-Za-z][A-Za-z0-9_-]*)*$/;
-const ALIAS_KEY_PATTERN = /^(?:[A-Za-z][A-Za-z0-9_-]*(?:\.[A-Za-z][A-Za-z0-9_-]*)*|[A-Za-z][A-Za-z0-9_-]*:[A-Za-z][A-Za-z0-9_.-]*)$/;
 
-function validateContextV2(
-	value: unknown,
-	path: Path,
-	requireDelimitedUntrusted = false,
-): void {
+function validateContext(value: unknown, path: Path): void {
 	const object = record(value, path);
 	exactKeys(
 		object,
@@ -324,11 +227,7 @@ function validateContextV2(
 		if (!VARIABLE_NAME_PATTERN.test(name)) {
 			fail([...path, "variables", name], "a variable name");
 		}
-		validateVariable(
-			variable,
-			[...path, "variables", name],
-			requireDelimitedUntrusted,
-		);
+		validateVariable(variable, [...path, "variables", name]);
 	}
 	const locales = record(object.locales, [...path, "locales"]);
 	if (Object.keys(locales).length === 0) fail([...path, "locales"], "a non-empty object");
@@ -340,59 +239,7 @@ function validateContextV2(
 	digest(object.releaseDigest, [...path, "releaseDigest"]);
 }
 
-export function assertCatalogArtifactV2(value: unknown): asserts value is S11tCatalogArtifactV2 {
-	const object = record(value, []);
-	exactKeys(
-		object,
-		[
-			"format",
-			"schemaVersion",
-			"compilerVersion",
-			"releaseProfile",
-			"policyDigest",
-			"createdFrom",
-			"contexts",
-			"aliases",
-			"catalogDigest",
-		],
-		[],
-	);
-	literal(object.format, "s11t.catalog", ["format"]);
-	literal(object.schemaVersion, 2, ["schemaVersion"]);
-	nonEmptyString(object.compilerVersion, ["compilerVersion"]);
-	nonEmptyString(object.releaseProfile, ["releaseProfile"]);
-	digest(object.policyDigest, ["policyDigest"]);
-	const createdFrom = record(object.createdFrom, ["createdFrom"]);
-	exactKeys(createdFrom, ["configPath", "sourceFiles"], ["createdFrom"]);
-	relativePosixPath(createdFrom.configPath, ["createdFrom", "configPath"]);
-	stringArray(createdFrom.sourceFiles, ["createdFrom", "sourceFiles"]).forEach(
-		(sourceFile, index) => relativePosixPath(sourceFile, ["createdFrom", "sourceFiles", index]),
-	);
-	const contexts = record(object.contexts, ["contexts"]);
-	for (const [key, context] of Object.entries(contexts)) {
-		if (!DOT_KEY_PATTERN.test(key)) fail(["contexts", key], "a dot context key");
-		validateContextV2(context, ["contexts", key]);
-	}
-	const aliases = record(object.aliases, ["aliases"]);
-	for (const [alias, target] of Object.entries(aliases)) {
-		if (!ALIAS_KEY_PATTERN.test(alias)) fail(["aliases", alias], "a dot or legacy context key");
-		const canonical = nonEmptyString(target, ["aliases", alias]);
-		if (!DOT_KEY_PATTERN.test(canonical)) fail(["aliases", alias], "a canonical dot context key target");
-	}
-	digest(object.catalogDigest, ["catalogDigest"]);
-}
-
-export function isCatalogArtifactV2(value: unknown): value is S11tCatalogArtifactV2 {
-	try {
-		assertCatalogArtifactV2(value);
-		return true;
-	} catch (error) {
-		if (error instanceof S11tError) return false;
-		throw error;
-	}
-}
-
-export function assertCatalogArtifactV3(value: unknown): asserts value is S11tCatalogArtifactV3 {
+export function assertCatalogArtifact(value: unknown): asserts value is S11tCatalogArtifact {
 	const object = record(value, []);
 	exactKeys(
 		object,
@@ -411,8 +258,8 @@ export function assertCatalogArtifactV3(value: unknown): asserts value is S11tCa
 		[],
 	);
 	literal(object.format, "s11t.catalog", ["format"]);
-	literal(object.schemaVersion, 3, ["schemaVersion"]);
-	literal(object.renderingContract, "delimited-context-v1", ["renderingContract"]);
+	literal(object.schemaVersion, 1, ["schemaVersion"]);
+	literal(object.renderingContract, "delimited-context", ["renderingContract"]);
 	nonEmptyString(object.compilerVersion, ["compilerVersion"]);
 	nonEmptyString(object.releaseProfile, ["releaseProfile"]);
 	digest(object.policyDigest, ["policyDigest"]);
@@ -426,12 +273,12 @@ export function assertCatalogArtifactV3(value: unknown): asserts value is S11tCa
 	const contexts = record(object.contexts, ["contexts"]);
 	for (const [key, context] of Object.entries(contexts)) {
 		if (!DOT_KEY_PATTERN.test(key)) fail(["contexts", key], "a dot context key");
-		validateContextV2(context, ["contexts", key], true);
+		validateContext(context, ["contexts", key]);
 	}
 	const aliases = record(object.aliases, ["aliases"]);
 	for (const [alias, target] of Object.entries(aliases)) {
-		if (!ALIAS_KEY_PATTERN.test(alias)) {
-			fail(["aliases", alias], "a dot or legacy context key");
+		if (!DOT_KEY_PATTERN.test(alias)) {
+			fail(["aliases", alias], "a dot context key");
 		}
 		const canonical = nonEmptyString(target, ["aliases", alias]);
 		if (!DOT_KEY_PATTERN.test(canonical)) {
@@ -441,9 +288,9 @@ export function assertCatalogArtifactV3(value: unknown): asserts value is S11tCa
 	digest(object.catalogDigest, ["catalogDigest"]);
 }
 
-export function isCatalogArtifactV3(value: unknown): value is S11tCatalogArtifactV3 {
+export function isCatalogArtifact(value: unknown): value is S11tCatalogArtifact {
 	try {
-		assertCatalogArtifactV3(value);
+		assertCatalogArtifact(value);
 		return true;
 	} catch (error) {
 		if (error instanceof S11tError) return false;

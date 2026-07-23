@@ -18,7 +18,7 @@ import { inspectContext } from "../src/inspect-command.js";
 
 const temporaryDirectories: string[] = [];
 
-function temporaryFixture(name = "valid/multilingual"): string {
+function temporaryFixture(name = "valid/content-first"): string {
 	const directory = mkdtempSync(join(tmpdir(), "s11t-build-"));
 	temporaryDirectories.push(directory);
 	cpSync(new URL(`../../../fixtures/${name}`, import.meta.url), directory, { recursive: true });
@@ -32,26 +32,26 @@ afterEach(() => {
 describe("build command", () => {
 	it("emits deterministic artifact and type bytes and passes --check", () => {
 		const directory = temporaryFixture();
-		const first = buildProject({ cwd: directory });
+		const first = buildProject({ cwd: directory, releaseProfile: "production" });
 		const firstJson = readFileSync(first.catalogPath, "utf8");
 		const firstTypes = readFileSync(first.typesPath, "utf8");
-		const second = buildProject({ cwd: directory });
+		const second = buildProject({ cwd: directory, releaseProfile: "production" });
 		expect(readFileSync(second.catalogPath, "utf8")).toBe(firstJson);
 		expect(readFileSync(second.typesPath, "utf8")).toBe(firstTypes);
-		expect(buildProject({ cwd: directory, check: true }).checked).toBe(true);
+		expect(buildProject({ cwd: directory, releaseProfile: "production", check: true }).checked).toBe(true);
 		expect(() => createCatalog(JSON.parse(firstJson))).not.toThrow();
 		expect(firstJson).not.toContain(directory);
 		expect(firstTypes).toContain("export type SystemContextKey =");
-		expect(firstTypes).toContain('"name": string;');
+		expect(firstTypes).toContain('"outputRequirements": string;');
 	});
 
 	it("detects stale output without rewriting it", () => {
 		const directory = temporaryFixture();
-		const result = buildProject({ cwd: directory });
+		const result = buildProject({ cwd: directory, releaseProfile: "production" });
 		const before = readFileSync(result.catalogPath, "utf8");
-		const sourcePath = join(directory, "contexts/greeting.context.toml");
-		writeFileSync(sourcePath, readFileSync(sourcePath, "utf8").replace("Bonjour", "Salut"));
-		expect(() => buildProject({ cwd: directory, check: true })).toThrowError(
+		const sourcePath = join(directory, "contexts/structuredGeneration/repair.context.toml");
+		writeFileSync(sourcePath, readFileSync(sourcePath, "utf8").replace("Repair", "Fix"));
+		expect(() => buildProject({ cwd: directory, releaseProfile: "production", check: true })).toThrowError(
 			expect.objectContaining<S11tDiagnosticError>({
 				diagnostics: [expect.objectContaining({ code: "S11T_BUILD_STALE" })],
 			}),
@@ -59,16 +59,8 @@ describe("build command", () => {
 		expect(readFileSync(result.catalogPath, "utf8")).toBe(before);
 	});
 
-	it("builds artifact v3 only when explicitly configured", () => {
+	it("builds the current artifact contract", () => {
 		const directory = temporaryFixture("valid/content-first");
-		const configPath = join(directory, "s11t.config.toml");
-		writeFileSync(
-			configPath,
-			readFileSync(configPath, "utf8").replace(
-				"artifact_version = 2",
-				"artifact_version = 3",
-			),
-		);
 		const result = buildProject({
 			cwd: directory,
 			releaseProfile: "production",
@@ -78,11 +70,11 @@ describe("build command", () => {
 			renderingContract: string;
 		};
 		expect(artifact).toMatchObject({
-			schemaVersion: 3,
-			renderingContract: "delimited-context-v1",
+			schemaVersion: 1,
+			renderingContract: "delimited-context",
 		});
 		expect(readFileSync(result.typesPath, "utf8")).toContain(
-			'import { createCatalogV3 } from "@s11t/runtime";',
+			'import { createCatalog } from "@s11t/runtime";',
 		);
 		expect(() => createCatalog(artifact)).not.toThrow();
 		expect(
@@ -101,17 +93,17 @@ describe("build command", () => {
 
 	it("preserves previous successful outputs when validation fails", () => {
 		const directory = temporaryFixture();
-		const result = buildProject({ cwd: directory });
+		const result = buildProject({ cwd: directory, releaseProfile: "production" });
 		const beforeJson = readFileSync(result.catalogPath, "utf8");
 		const beforeTypes = readFileSync(result.typesPath, "utf8");
-		writeFileSync(join(directory, "contexts/broken.context.toml"), "schema_version = [");
-		expect(() => buildProject({ cwd: directory })).toThrow(S11tDiagnosticError);
+		writeFileSync(join(directory, "contexts/broken.context.toml"), "text = [");
+		expect(() => buildProject({ cwd: directory, releaseProfile: "production" })).toThrow(S11tDiagnosticError);
 		expect(readFileSync(result.catalogPath, "utf8")).toBe(beforeJson);
 		expect(readFileSync(result.typesPath, "utf8")).toBe(beforeTypes);
 	});
 
 	it.skipIf(process.platform === "win32")("rejects out_dir symlinks outside the project", () => {
-		const directory = temporaryFixture("valid/simple");
+		const directory = temporaryFixture("valid/content-first");
 		const outside = mkdtempSync(join(tmpdir(), "s11t-build-outside-"));
 		temporaryDirectories.push(outside);
 		symlinkSync(outside, join(directory, "linked-output"), "dir");
@@ -120,7 +112,7 @@ describe("build command", () => {
 			configPath,
 			readFileSync(configPath, "utf8").replace('out_dir = ".s11t"', 'out_dir = "linked-output"'),
 		);
-		expect(() => buildProject({ cwd: directory })).toThrowError(
+		expect(() => buildProject({ cwd: directory, releaseProfile: "production" })).toThrowError(
 			expect.objectContaining<S11tDiagnosticError>({
 				diagnostics: [expect.objectContaining({ code: "S11T_CONFIG_INVALID" })],
 			}),

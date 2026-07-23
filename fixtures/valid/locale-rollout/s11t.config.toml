@@ -1,6 +1,3 @@
-schema_version = 2
-authoring_version = 2
-artifact_version = 2
 source_dir = "contexts"
 out_dir = ".s11t"
 

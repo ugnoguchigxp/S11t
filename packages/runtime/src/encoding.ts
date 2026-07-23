@@ -1,6 +1,6 @@
 import { canonicalJson } from "./canonical-json.js";
 import { S11tError } from "./diagnostics.js";
-import type { JsonValue, S11tCompiledVariableV1 } from "./types.js";
+import type { JsonValue, S11tCompiledVariable } from "./types.js";
 
 function isPlainObject(value: object): value is Record<string, unknown> {
 	const prototype = Object.getPrototypeOf(value) as unknown;
@@ -90,7 +90,7 @@ function escapeBoundaryCharacters(value: string): string {
 
 export function encodeValue(
 	value: unknown,
-	definition: S11tCompiledVariableV1,
+	definition: S11tCompiledVariable,
 	path: Array<string | number>,
 	options: { escapeBoundaryCharacters?: boolean } = {},
 ): string {

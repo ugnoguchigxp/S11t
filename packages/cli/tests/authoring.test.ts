@@ -3,12 +3,11 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 import {
-	parseAndResolveAuthoringV2,
-	validateResolvedDocumentsV2,
-	type ResolvedAuthoringDocumentV2,
-} from "../src/authoring-v2.js";
-import { compileProject, isCompiledProjectV2 } from "../src/compile-source.js";
-import { parseProjectConfigV2 } from "../src/config-v2.js";
+	parseAndResolveAuthoring,
+	validateResolvedDocuments,
+} from "../src/authoring.js";
+import { compileProject } from "../src/compile-source.js";
+import { parseProjectConfig } from "../src/config.js";
 import { inspectContext, inspectCoverage } from "../src/inspect-command.js";
 
 const fixtureRoot = fileURLToPath(
@@ -19,10 +18,7 @@ const coverageFixtureRoot = fileURLToPath(
 );
 
 function testConfig() {
-	return parseProjectConfigV2({
-		schema_version: 2,
-		authoring_version: 2,
-		artifact_version: 2,
+	return parseProjectConfig({
 		source_dir: "contexts",
 		out_dir: "generated",
 		authoring: { source_locale: "ja-JP" },
@@ -40,14 +36,12 @@ function expectDiagnostic(action: () => unknown, code: string): void {
 	);
 }
 
-describe("content-first authoring v2", () => {
+describe("content-first authoring", () => {
 	it("derives a dot key and expands project-level locale and variable policy", () => {
 		const project = compileProject(undefined, fixtureRoot, "production");
-		expect(isCompiledProjectV2(project)).toBe(true);
-		if (!isCompiledProjectV2(project)) throw new Error("Expected v2 project");
 		expect(Object.keys(project.artifact.contexts)).toEqual(["structuredGeneration.repair"]);
 		expect(project.artifact.aliases).toEqual({
-			"structuredGeneration:repair": "structuredGeneration.repair",
+			"structuredGeneration.repairAlias": "structuredGeneration.repair",
 		});
 		expect(project.artifact.contexts["structuredGeneration.repair"]).toMatchObject({
 			key: "structuredGeneration.repair",
@@ -65,10 +59,8 @@ describe("content-first authoring v2", () => {
 		});
 	});
 
-	it("compiles artifact v3 only when explicitly selected", () => {
-		const config = testConfig();
-		config.artifactVersion = 3;
-		const document = parseAndResolveAuthoringV2(
+	it("enforces the delimited placement contract for untrusted variables", () => {
+		const document = parseAndResolveAuthoring(
 			{
 				text: "[[value]]",
 				variables: {
@@ -82,7 +74,7 @@ describe("content-first authoring v2", () => {
 			},
 			"contexts/example/greeting.context.toml",
 			"example/greeting.context.toml",
-			config,
+			testConfig(),
 			"development",
 		);
 		expect(document.definition.variables.value).toMatchObject({
@@ -92,14 +84,14 @@ describe("content-first authoring v2", () => {
 	});
 
 	it("reports resolved values and their top-level origins", () => {
-		const result = inspectContext("structuredGeneration:repair", {
+		const result = inspectContext("structuredGeneration.repairAlias", {
 			cwd: fixtureRoot,
 			releaseProfile: "production",
 			resolved: true,
 		}) as Record<string, unknown>;
 		expect(result).toMatchObject({
 			key: "structuredGeneration.repair",
-			requestedKey: "structuredGeneration:repair",
+			requestedKey: "structuredGeneration.repairAlias",
 			aliasUsed: true,
 			sourceLocale: "ja-JP",
 			releaseProfile: "production",
@@ -110,7 +102,7 @@ describe("content-first authoring v2", () => {
 		});
 	});
 
-	it("inspects direct v1 and v2 keys and reports missing contexts and locales", () => {
+	it("inspects keys and reports missing contexts and locales", () => {
 		expect(
 			inspectContext("structuredGeneration.repair", {
 				cwd: fixtureRoot,
@@ -142,18 +134,6 @@ describe("content-first authoring v2", () => {
 			"S11T_LOCALE_NOT_FOUND",
 		);
 
-		const v1Root = fileURLToPath(new URL("../../../fixtures/valid/simple/", import.meta.url));
-		expect(inspectContext("structuredOutput:repair", { cwd: v1Root, locale: "en-US" })).toEqual(
-			expect.objectContaining({ id: "structuredOutput:repair", locale: "en-US" }),
-		);
-		expectDiagnostic(
-			() => inspectContext("missing:context", { cwd: v1Root }),
-			"S11T_CONTEXT_NOT_FOUND",
-		);
-		expectDiagnostic(
-			() => inspectContext("structuredOutput:repair", { cwd: v1Root, locale: "fr-FR" }),
-			"S11T_LOCALE_NOT_FOUND",
-		);
 	});
 
 	it("reports direct, ordered fallback, missing, and required-profile coverage", () => {
@@ -215,7 +195,7 @@ describe("content-first authoring v2", () => {
 
 	it("rejects a translation that attempts to override the source locale", () => {
 		expect(() =>
-			parseAndResolveAuthoringV2(
+			parseAndResolveAuthoring(
 				{
 					text: "正本",
 					translations: { "ja-JP": { text: "上書き" } },
@@ -234,32 +214,17 @@ describe("content-first authoring v2", () => {
 		);
 	});
 
-	it("rejects a legacy alias that conflicts with project alias policy", () => {
+	it("rejects an alias whose target is not a compiled context", () => {
 		const config = testConfig();
-		config.keyAliases["example:greeting"] = "example.other";
-		const document = {
-			file: "contexts/example/greeting.context.toml",
-			sourcePath: "example/greeting.context.toml",
-			definition: {
-				key: "example.greeting",
-				owner: "examples",
-				contentKind: "text",
-				sourceLocale: "ja-JP",
-				requiredLocales: ["ja-JP"],
-				variables: {},
-				sections: [],
-			},
-			origins: {
-				key: "path",
-				owner: "keyspace",
-				contentKind: "built-in",
-				sourceLocale: "authoring",
-				requiredLocales: "profile",
-				variables: {},
-			},
-			legacyAlias: "example:greeting",
-		} satisfies ResolvedAuthoringDocumentV2;
-		expect(() => validateResolvedDocumentsV2([document], config)).toThrowError(
+		config.keyAliases["example.greetingAlias"] = "example.other";
+		const document = parseAndResolveAuthoring(
+			{ text: "正本" },
+			"contexts/example/greeting.context.toml",
+			"example/greeting.context.toml",
+			config,
+			"development",
+		);
+		expect(() => validateResolvedDocuments([document], config)).toThrowError(
 			expect.objectContaining({
 				diagnostics: [expect.objectContaining({ code: "S11T_KEY_ALIAS_INVALID" })],
 			}),
@@ -270,7 +235,7 @@ describe("content-first authoring v2", () => {
 		{
 			name: "release profile",
 			action: () =>
-				parseAndResolveAuthoringV2(
+				parseAndResolveAuthoring(
 					{ text: "正本" },
 					"contexts/example/greeting.context.toml",
 					"example/greeting.context.toml",
@@ -282,7 +247,7 @@ describe("content-first authoring v2", () => {
 		{
 			name: "variable profile",
 			action: () =>
-				parseAndResolveAuthoringV2(
+				parseAndResolveAuthoring(
 					{
 						text: "[[value]]",
 						variables: { value: { profile: "constructor" } },
@@ -404,6 +369,22 @@ describe("content-first authoring v2", () => {
 			code: "S11T_UNSAFE_UNTRUSTED_RAW",
 		},
 		{
+			name: "unsafe untrusted inline variable",
+			input: {
+				text: "[[value]]",
+				variables: {
+					value: {
+						type: "string",
+						trust: "untrusted",
+						placement: "inline",
+						encoding: "json-string",
+					},
+				},
+			},
+			sourcePath: "example/greeting.context.toml",
+			code: "S11T_UNSAFE_UNTRUSTED_PLACEMENT",
+		},
+		{
 			name: "raw non-string variable",
 			input: {
 				text: "[[value]]",
@@ -472,7 +453,7 @@ describe("content-first authoring v2", () => {
 	])("rejects $name", ({ input, sourcePath, code }) => {
 		expectDiagnostic(
 			() =>
-				parseAndResolveAuthoringV2(
+				parseAndResolveAuthoring(
 					input,
 					"contexts/example/greeting.context.toml",
 					sourcePath,
@@ -486,7 +467,7 @@ describe("content-first authoring v2", () => {
 	it("supports unowned content when governance allows it and rejects document collisions", () => {
 		const config = testConfig();
 		config.governance.requireOwner = false;
-		const document = parseAndResolveAuthoringV2(
+		const document = parseAndResolveAuthoring(
 			{ text: "正本" },
 			"contexts/other/greeting.context.toml",
 			"other/greeting.context.toml",
@@ -495,7 +476,7 @@ describe("content-first authoring v2", () => {
 		);
 		expect(document.definition.owner).toBe("unowned");
 		expectDiagnostic(
-			() => validateResolvedDocumentsV2([document, { ...document, file: "duplicate.toml" }], config),
+			() => validateResolvedDocuments([document, { ...document, file: "duplicate.toml" }], config),
 			"S11T_KEY_COLLISION",
 		);
 	});

@@ -1,15 +1,42 @@
-import { createAppCatalog } from "../../examples/node-basic/.s11t/catalog.generated.js";
+import { createCatalog, type CatalogContract } from "../../packages/runtime/src/index.js";
 
-const catalog = createAppCatalog({});
-const p = catalog.bind({ instructionLocale: "ja-JP" });
+type Key = "context.with-values" | "context.without-values";
+type Values = {
+	"context.with-values": { value: string };
+	"context.without-values": Record<string, never>;
+};
+type Outputs = {
+	"context.with-values": "text";
+	"context.without-values": "text";
+};
+type Contract = CatalogContract<Key, Values, Outputs>;
 
-p("codingAgent:identity", { taskGoal: "valid" });
+const catalog = createCatalog<Contract>({});
+const bound = catalog.bindText({ instructionLocale: "ja-JP" });
+const request = catalog.bindRequest({ instructionLocale: "ja-JP" });
+const live = catalog.createTextRenderer(() => ({ instructionLocale: "ja-JP" }));
 
-// @ts-expect-error unknown SystemContext key
-p("unknown:key", { taskGoal: "invalid" });
+bound.p("context.with-values", { value: "ok" });
+bound.byKey["context.with-values"]({ value: "ok" });
+bound.p("context.without-values", {});
+bound.byKey["context.without-values"]({});
+request.invoke("context.with-values", { value: "ok" });
+live("context.with-values", { value: "ok" });
 
 // @ts-expect-error missing required runtime value
-p("codingAgent:identity", {});
+bound.p("context.with-values", {});
 
-// @ts-expect-error wrong runtime value type
-p("codingAgent:identity", { taskGoal: 42 });
+// @ts-expect-error extra runtime value on an exact empty context
+bound.p("context.without-values", { extra: true });
+
+// @ts-expect-error extra runtime value through byKey
+bound.byKey["context.without-values"]({ extra: true });
+
+// @ts-expect-error unknown canonical key
+bound.p("unknown.context", {});
+
+// @ts-expect-error removed colon key syntax
+live("context:with-values", { value: "invalid" });
+
+// @ts-expect-error unknown byKey property
+bound.byKey["unknown.context"]({});

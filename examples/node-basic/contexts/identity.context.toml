@@ -1,15 +1,6 @@
-schema_version = 1
-
-[context]
-id = "codingAgent:identity"
-version = "1.0.0"
-owner = "coding-agent"
-source_locale = "ja-JP"
-required_locales = ["ja-JP", "en-US"]
-output = "text"
+key = "codingAgent.identity"
 
 [variables.taskGoal]
-required = true
 type = "string"
 trust = "untrusted"
 placement = "delimited-context"
@@ -21,11 +12,9 @@ kind = "instruction"
 severity = "must"
 enforcement = "prompt"
 optimizable = false
-
-[sections.locales."ja-JP"]
 text = "あなたはユーザーTaskを自動化するCoding Agentです。"
 
-[sections.locales."en-US"]
+[sections.translations."en-US"]
 text = "You are a Coding Agent that automates user tasks."
 
 [[sections]]
@@ -34,15 +23,13 @@ kind = "runtime-fact"
 severity = "should"
 enforcement = "prompt"
 optimizable = false
-
-[sections.locales."ja-JP"]
 text = '''
 <TASK_GOAL_JSON_STRING>
 [[taskGoal]]
 </TASK_GOAL_JSON_STRING>
 '''
 
-[sections.locales."en-US"]
+[sections.translations."en-US"]
 text = '''
 <TASK_GOAL_JSON_STRING>
 [[taskGoal]]

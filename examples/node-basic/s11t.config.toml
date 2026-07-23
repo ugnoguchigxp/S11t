@@ -1,5 +1,17 @@
-schema_version = 1
 source_dir = "contexts"
 out_dir = ".s11t"
+
+[authoring]
+source_locale = "ja-JP"
+
+[governance]
+require_owner = true
+
+[keyspaces.codingAgent]
+owner = "coding-agent"
+
+[release_profiles.development]
+required_locales = ["$source"]
+
+[release_profiles.production]
 required_locales = ["ja-JP", "en-US"]
-default_locale = "ja-JP"

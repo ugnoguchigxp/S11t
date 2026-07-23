@@ -1,9 +1,9 @@
 # S11t
 
-S11t is a backend-first authoring, compilation, and runtime toolkit for versioned SystemContext templates.
+S11t is a backend-first toolkit for authoring, compiling, and rendering SystemContext templates.
 
-Authors edit content-first TOML sources, the CLI emits deterministic JSON artifacts and TypeScript
-contracts, and applications load those JSON objects into a filesystem-independent runtime.
+Authors edit content-first TOML. The CLI emits deterministic JSON artifacts and TypeScript contracts, and
+applications load those artifacts into a filesystem-independent runtime.
 
 ## Install
 
@@ -12,15 +12,14 @@ npm install @s11t/runtime
 npm install --save-dev @s11t/cli
 ```
 
-S11t v2 derives canonical dot keys from source paths, binds locale from one top-level request/run setting,
-and returns immutable content identity for audited provider paths. Start with the
-[v2 guide](./docs/guides/getting-started.md), or use the
-[v1-to-v2 migration guide](./docs/guides/migrating-v1-to-v2.md) for an existing catalog.
+S11t derives canonical dot keys from source paths, binds locale at the request boundary, structurally
+delimits untrusted values, and returns immutable content identity for audited provider paths. Start with
+the [getting-started guide](./docs/guides/getting-started.md).
 
 ## Development
 
-Requirements: Node.js 20.19 or newer in the Node 20 line, Node.js 22, or Node.js 24,
-plus Corepack-enabled pnpm.
+Requirements: Node.js 20.19 or newer in the Node 20 line, Node.js 22, or Node.js 24, plus
+Corepack-enabled pnpm.
 
 ```sh
 pnpm install --frozen-lockfile
@@ -28,34 +27,20 @@ pnpm verify
 pnpm test:packages
 ```
 
-`pnpm test:packages` creates real runtime and CLI tarballs, checks their public
-contents, and installs them into an isolated ESM consumer. Release candidates
-add `pnpm release:dry-run -- --channel canary` after a Git remote and package
-repository metadata have been configured.
-
-To dogfood a canary in a sibling NightWorkers checkout without publishing it to
-npm, run `pnpm deploy:nightworkers-canary`. The command builds and validates a
-snapshot from the committed S11t `HEAD`, then updates NightWorkers' vendored
-tarballs, `package.json`, and `bun.lock` with automatic rollback on failure. Pass
-`--target /path/to/nightWorkers` for a non-sibling checkout and `--verify` to
-also run NightWorkers' full typecheck and build.
+`pnpm test:packages` creates runtime and CLI tarballs, checks their public contents, and installs them
+into an isolated ESM consumer. Release candidates add `pnpm release:dry-run -- --channel canary` after
+the Git remote and package repository metadata are configured.
 
 ## Project boundary
 
-- `@s11t/runtime` contains portable TypeScript and must not import Node.js builtins.
+- `@s11t/runtime` contains portable TypeScript and does not import Node.js builtins.
 - `@s11t/cli` owns filesystem access, TOML parsing, validation, and file emission.
 - LLM calls, authorization, persistence, and provider adapters belong to the host application.
 
-The v1 compatibility contracts and the content-first v2 contracts are documented under
-[`docs/specification`](./docs/specification), with public schemas under [`schemas`](./schemas).
-
-The [content-first authoring and locale resolution implementation plan](./docs/proposals/content-first-authoring-and-locale-resolution.md)
-describes the v2 design, dot-key migration, NightWorkers canary, and rollout gates.
-
-See the [getting started guide](./docs/guides/getting-started.md),
-[backend integration guide](./docs/guides/backend-integration.md), and
-[trust-boundary guide](./docs/guides/trust-boundaries.md). The runnable
-[`examples/node-basic`](./examples/node-basic) project retains the v1 compatibility flow.
+The contracts are documented under [`docs/specification`](./docs/specification), with public JSON
+Schemas under [`schemas`](./schemas). See the [backend integration](./docs/guides/backend-integration.md)
+and [trust-boundary](./docs/guides/trust-boundaries.md) guides, or run
+[`examples/node-basic`](./examples/node-basic).
 
 Maintainers preparing a registry release should follow the
 [npm publishing runbook](./docs/release/npm-publishing.md).

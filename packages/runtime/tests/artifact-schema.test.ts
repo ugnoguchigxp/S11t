@@ -3,148 +3,106 @@ import { readFileSync } from "node:fs";
 import Ajv2020 from "ajv/dist/2020.js";
 import { describe, expect, it } from "vitest";
 
-import { isCatalogArtifactV1 } from "../src/artifact-schema.js";
-import type { S11tCatalogArtifactV1 } from "../src/types.js";
+import { compileCatalog, type CanonicalContextDefinition } from "../src/compiler.js";
+import { isCatalogArtifact } from "../src/artifact-schema.js";
+import { createCatalog, S11tError } from "../src/index.js";
 
-const digest = `sha256:${"0".repeat(64)}`;
-
-function validArtifact(): S11tCatalogArtifactV1 {
-	return {
-		format: "s11t.catalog",
-		schemaVersion: 1,
-		compilerVersion: "0.0.0",
-		defaultLocale: "en-US",
-		createdFrom: {
-			configPath: "s11t.config.toml",
-			sourceFiles: ["contexts/example.context.toml"],
-		},
-		contexts: {
-			"example:greeting": {
-				id: "example:greeting",
-				version: "1.0.0",
-				owner: "examples",
-				output: "text",
-				sourceLocale: "en-US",
-				requiredLocales: ["en-US"],
-				variables: {
-					name: {
-						required: true,
-						type: "string",
-						trust: "trusted",
-						placement: "inline",
-						encoding: "raw",
-					},
-				},
-				locales: {
-					"en-US": {
-						sections: [
-							{
-								id: "context.text",
-								kind: "instruction",
-								severity: "must",
-								enforcement: "prompt",
-								optimizable: false,
-								segments: [
-									{ type: "literal", value: "Hello, " },
-									{ type: "variable", name: "name" },
-								],
-							},
-						],
-						artifactHash: digest,
-					},
-				},
-				definitionHash: digest,
-				releaseDigest: digest,
+function artifact() {
+	const definition: CanonicalContextDefinition = {
+		key: "example.greeting",
+		owner: "examples",
+		contentKind: "text",
+		sourceLocale: "en-US",
+		requiredLocales: ["en-US"],
+		variables: {},
+		sections: [
+			{
+				id: "context.text",
+				kind: "instruction",
+				severity: "must",
+				enforcement: "prompt",
+				optimizable: false,
+				locales: { "en-US": "Hello" },
 			},
-		},
-		catalogDigest: digest,
+		],
 	};
+	return compileCatalog([definition], {
+		releaseProfile: "development",
+		aliases: { "example.greetingAlias": "example.greeting" },
+		provenance: { configPath: "s11t.config.toml", sourceFiles: ["contexts/example.context.toml"] },
+	});
 }
 
 const schema = JSON.parse(
-	readFileSync(new URL("../../../schemas/s11t-artifact-v1.schema.json", import.meta.url), "utf8"),
+	readFileSync(new URL("../../../schemas/s11t-artifact.schema.json", import.meta.url), "utf8"),
 ) as object;
-const ajv = new Ajv2020({ strict: true });
-const validateJsonSchema = ajv.compile(schema);
+const validateJsonSchema = new Ajv2020({ strict: true }).compile(schema);
 
 describe("artifact schema", () => {
-	it("accepts the v1 artifact fixture", () => {
-		const artifact = validArtifact();
-		expect(isCatalogArtifactV1(artifact)).toBe(true);
-		expect(validateJsonSchema(artifact)).toBe(true);
+	it("keeps runtime structural validation and JSON Schema aligned", () => {
+		const input = artifact();
+		expect(isCatalogArtifact(input)).toBe(true);
+		expect(validateJsonSchema(input)).toBe(true);
+		const invalid = structuredClone(input) as unknown as Record<string, unknown>;
+		invalid.extra = true;
+		expect(isCatalogArtifact(invalid)).toBe(false);
+		expect(validateJsonSchema(invalid)).toBe(false);
 	});
 
 	it.each([
-		["unknown schema", (artifact: Record<string, unknown>) => (artifact.schemaVersion = 2)],
-		["extra top-level property", (artifact: Record<string, unknown>) => (artifact.extra = true)],
-		["invalid digest", (artifact: Record<string, unknown>) => (artifact.catalogDigest = "sha256:ABC")],
-		[
-			"absolute provenance path",
-			(artifact: Record<string, unknown>) => {
-				const createdFrom = artifact.createdFrom as Record<string, unknown>;
-				createdFrom.configPath = "/private/config.toml";
+		{
+			name: "invalid source locale",
+			mutate: (input: ReturnType<typeof artifact>) => {
+				input.contexts["example.greeting"]!.sourceLocale = "not a locale";
 			},
-		],
-		[
-			"optional variable",
-			(artifact: Record<string, unknown>) => {
-				const contexts = artifact.contexts as Record<string, Record<string, unknown>>;
-				const context = contexts["example:greeting"];
-				const variables = context?.variables as Record<string, Record<string, unknown>>;
-				if (variables.name !== undefined) variables.name.required = false;
+		},
+		{
+			name: "invalid compiled locale key",
+			mutate: (input: ReturnType<typeof artifact>) => {
+				const context = input.contexts["example.greeting"]!;
+				context.locales["not a locale"] = context.locales["en-US"]!;
+				delete context.locales["en-US"];
 			},
-		],
-		[
-			"empty required locale list",
-			(artifact: Record<string, unknown>) => {
-				const contexts = artifact.contexts as Record<string, Record<string, unknown>>;
-				const context = contexts["example:greeting"];
-				if (context !== undefined) context.requiredLocales = [];
+		},
+		{
+			name: "invalid variable name",
+			mutate: (input: ReturnType<typeof artifact>) => {
+				input.contexts["example.greeting"]!.variables["bad-name"] = {
+					required: true,
+					type: "string",
+					trust: "trusted",
+					placement: "inline",
+					encoding: "raw",
+				};
 			},
-		],
-		[
-			"duplicate required locale",
-			(artifact: Record<string, unknown>) => {
-				const contexts = artifact.contexts as Record<string, Record<string, unknown>>;
-				const context = contexts["example:greeting"];
-				if (context !== undefined) context.requiredLocales = ["en-US", "en-US"];
-			},
-		],
-		[
-			"empty section list",
-			(artifact: Record<string, unknown>) => {
-				const context = (artifact.contexts as Record<string, Record<string, unknown>>)["example:greeting"];
-				const locale = (context?.locales as Record<string, Record<string, unknown>>)["en-US"];
-				if (locale !== undefined) locale.sections = [];
-			},
-		],
-		[
-			"extra segment property",
-			(artifact: Record<string, unknown>) => {
-				const context = (artifact.contexts as Record<string, Record<string, unknown>>)["example:greeting"];
-				const locale = (context?.locales as Record<string, Record<string, unknown>>)["en-US"];
-				const section = (locale?.sections as Array<Record<string, unknown>>)[0];
-				const segment = (section?.segments as Array<Record<string, unknown>>)[0];
-				if (segment !== undefined) segment.extra = true;
-			},
-		],
-	])("keeps runtime and JSON Schema rejection aligned for %s", (_name, mutate) => {
-		const artifact = structuredClone(validArtifact()) as unknown as Record<string, unknown>;
-		mutate(artifact);
-		expect(isCatalogArtifactV1(artifact)).toBe(false);
-		expect(validateJsonSchema(artifact)).toBe(false);
+		},
+	])("rejects $name in both validators", ({ mutate }) => {
+		const input = artifact();
+		mutate(input);
+		expect(isCatalogArtifact(input)).toBe(false);
+		expect(validateJsonSchema(input)).toBe(false);
 	});
 
-	it("rejects non-JSON accessors and sparse arrays", () => {
-		const withAccessor = validArtifact() as unknown as Record<string, unknown>;
-		Object.defineProperty(withAccessor, "compilerVersion", {
-			enumerable: true,
-			get: () => "0.0.0",
-		});
-		expect(isCatalogArtifactV1(withAccessor)).toBe(false);
+	it("leaves cross-field alias integrity to the runtime validator", () => {
+		const input = artifact();
+		input.aliases["example.greetingAlias"] = "missing.context";
+		expect(isCatalogArtifact(input)).toBe(true);
+		expect(validateJsonSchema(input)).toBe(true);
+		expect(() => createCatalog(input)).toThrowError(
+			expect.objectContaining<Partial<S11tError>>({ code: "S11T_ARTIFACT_INVALID" }),
+		);
+	});
 
-		const withSparseArray = validArtifact();
-		withSparseArray.createdFrom.sourceFiles = new Array(1);
-		expect(isCatalogArtifactV1(withSparseArray)).toBe(false);
+	it("rejects untrusted variables without delimited placement", () => {
+		const input = artifact();
+		input.contexts["example.greeting"]!.variables.value = {
+			required: true,
+			type: "string",
+			trust: "untrusted",
+			placement: "inline",
+			encoding: "json-string",
+		};
+		expect(isCatalogArtifact(input)).toBe(false);
+		expect(validateJsonSchema(input)).toBe(false);
 	});
 });

@@ -1,41 +1,28 @@
 import { sha256 } from "@noble/hashes/sha2.js";
 import { bytesToHex, utf8ToBytes } from "@noble/hashes/utils.js";
 
-import { canonicalJson } from "./canonical-json.js";
 import type { CanonicalContextDefinition } from "./canonical-definition.js";
-import type { JsonValue, S11tCompiledSectionV1 } from "./types.js";
+import { canonicalJson } from "./canonical-json.js";
+import type {
+	JsonValue,
+	S11tCompiledSection,
+	S11tRenderingContract,
+} from "./types.js";
 
 const HASH_DOMAINS = {
-	definition: "s11t.definition.v1",
-	artifact: "s11t.artifact.v1",
-	release: "s11t.release.v1",
-	catalog: "s11t.catalog.v1",
-	rendered: "s11t.rendered.v1",
+	definition: "s11t.definition",
+	artifact: "s11t.artifact",
+	release: "s11t.release",
+	policy: "s11t.policy",
+	catalog: "s11t.catalog",
+	rendered: "s11t.rendered",
 } as const;
 
 export type S11tDigest = `sha256:${string}`;
 
-export type LocaleTemplateIdentityInput = {
-	id: string;
-	locale: string;
-	sections: S11tCompiledSectionV1[];
-};
-
-export type ReleaseIdentityInput = {
-	id: string;
-	version: string;
-	schemaVersion: 1;
-	compilerVersion: string;
-	definitionHash: string;
-	artifactHashes: Record<string, string>;
-};
-
-export type CatalogIdentityInput = {
-	schemaVersion: 1;
-	compilerVersion: string;
-	defaultLocale: string;
-	releaseDigests: Record<string, string>;
-};
+function compareCodeUnits(left: string, right: string): number {
+	return left < right ? -1 : left > right ? 1 : 0;
+}
 
 export function sha256Utf8(value: string): S11tDigest {
 	return `sha256:${bytesToHex(sha256(utf8ToBytes(value)))}`;
@@ -45,49 +32,82 @@ function hashCanonical(domain: string, value: JsonValue): S11tDigest {
 	return sha256Utf8(`${domain}\0${canonicalJson(value)}`);
 }
 
-function compareCodeUnits(left: string, right: string): number {
-	return left < right ? -1 : left > right ? 1 : 0;
-}
-
-export function hashDefinition(value: CanonicalContextDefinition): S11tDigest {
-	const identity: JsonValue = {
-		id: value.id,
-		version: value.version,
+export function hashDefinition(
+	value: CanonicalContextDefinition,
+	renderingContract: S11tRenderingContract,
+): S11tDigest {
+	return hashCanonical(HASH_DOMAINS.definition, {
+		renderingContract,
+		key: value.key,
 		owner: value.owner,
-		output: value.output,
+		contentKind: value.contentKind,
 		sourceLocale: value.sourceLocale,
 		requiredLocales: [...value.requiredLocales],
 		variables: value.variables,
 		sections: value.sections,
-	};
-	return hashCanonical(HASH_DOMAINS.definition, identity);
-}
-
-export function hashArtifact(value: LocaleTemplateIdentityInput): S11tDigest {
-	return hashCanonical(HASH_DOMAINS.artifact, {
-		id: value.id,
-		locale: value.locale,
-		sections: value.sections,
 	});
 }
 
-export function hashRelease(value: ReleaseIdentityInput): S11tDigest {
+export function hashArtifact(value: {
+	key: string;
+	locale: string;
+	sections: S11tCompiledSection[];
+	renderingContract: S11tRenderingContract;
+}): S11tDigest {
+	return hashCanonical(HASH_DOMAINS.artifact, value);
+}
+
+export function hashRelease(value: {
+	key: string;
+	compilerVersion: string;
+	definitionHash: string;
+	artifactHashes: Record<string, string>;
+	renderingContract: S11tRenderingContract;
+}): S11tDigest {
 	return hashCanonical(HASH_DOMAINS.release, {
-		id: value.id,
-		version: value.version,
-		schemaVersion: value.schemaVersion,
+		key: value.key,
+		schemaVersion: 1,
+		renderingContract: value.renderingContract,
 		compilerVersion: value.compilerVersion,
 		definitionHash: value.definitionHash,
-		artifacts: Object.entries(value.artifactHashes).sort(([left], [right]) => compareCodeUnits(left, right)),
+		artifacts: Object.entries(value.artifactHashes).sort(([left], [right]) =>
+			compareCodeUnits(left, right),
+		),
 	});
 }
 
-export function hashCatalog(value: CatalogIdentityInput): S11tDigest {
+export function hashPolicy(value: {
+	releaseProfile: string;
+	requiredLocales: Record<string, string[]>;
+	renderingContract: S11tRenderingContract;
+}): S11tDigest {
+	return hashCanonical(HASH_DOMAINS.policy, {
+		renderingContract: value.renderingContract,
+		releaseProfile: value.releaseProfile,
+		requiredLocales: Object.entries(value.requiredLocales).sort(([left], [right]) =>
+			compareCodeUnits(left, right),
+		),
+	});
+}
+
+export function hashCatalog(value: {
+	compilerVersion: string;
+	policyDigest: string;
+	releaseDigests: Record<string, string>;
+	aliases: Record<string, string>;
+	renderingContract: S11tRenderingContract;
+}): S11tDigest {
 	return hashCanonical(HASH_DOMAINS.catalog, {
-		schemaVersion: value.schemaVersion,
+		schemaVersion: 1,
+		renderingContract: value.renderingContract,
 		compilerVersion: value.compilerVersion,
-		defaultLocale: value.defaultLocale,
-		releases: Object.entries(value.releaseDigests).sort(([left], [right]) => compareCodeUnits(left, right)),
+		policyDigest: value.policyDigest,
+		releases: Object.entries(value.releaseDigests).sort(([left], [right]) =>
+			compareCodeUnits(left, right),
+		),
+		aliases: Object.entries(value.aliases).sort(([left], [right]) =>
+			compareCodeUnits(left, right),
+		),
 	});
 }
 

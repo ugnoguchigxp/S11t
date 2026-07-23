@@ -1,5 +1,5 @@
-export { parseAuthoringDocument, validateAuthoringDocuments } from "./authoring-schema.js";
-export type { AuthoringDocument } from "./authoring-schema.js";
+export { parseAndResolveAuthoring, validateResolvedDocuments } from "./authoring.js";
+export type { ResolvedAuthoringDocument } from "./authoring.js";
 export { parseProjectConfig } from "./config.js";
 export type { S11tProjectConfig } from "./config.js";
 export { buildProject } from "./build-command.js";

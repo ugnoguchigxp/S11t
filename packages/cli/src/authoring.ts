@@ -1,14 +1,13 @@
 import type {
-	CanonicalContextDefinitionV2,
-	CanonicalSectionDefinitionV2,
-	CanonicalVariableDefinitionV2,
+	CanonicalContextDefinition,
+	CanonicalSectionDefinition,
+	CanonicalVariableDefinition,
 } from "@s11t/runtime/compiler";
 
-import type { AuthoringDocument } from "./authoring-schema.js";
-import type { S11tProjectConfigV2 } from "./config-v2.js";
+import type { S11tProjectConfig } from "./config.js";
 import { S11tDiagnosticError, type S11tDiagnostic } from "./diagnostics.js";
 
-export type ResolutionOriginsV2 = {
+export type ResolutionOrigins = {
 	key: string;
 	owner: string;
 	contentKind: string;
@@ -17,12 +16,11 @@ export type ResolutionOriginsV2 = {
 	variables: Record<string, string>;
 };
 
-export type ResolvedAuthoringDocumentV2 = {
+export type ResolvedAuthoringDocument = {
 	file: string;
 	sourcePath: string;
-	definition: CanonicalContextDefinitionV2;
-	origins: ResolutionOriginsV2;
-	legacyAlias?: string;
+	definition: CanonicalContextDefinition;
+	origins: ResolutionOrigins;
 };
 
 type Path = Array<string | number>;
@@ -103,7 +101,7 @@ function deriveKey(sourcePath: string, file: string): string {
 	return segments.join(".");
 }
 
-function resolveOwner(key: string, config: S11tProjectConfigV2, file: string): { value: string; source: string } {
+function resolveOwner(key: string, config: S11tProjectConfig, file: string): { value: string; source: string } {
 	const matches = Object.entries(config.keyspaces)
 		.filter(([prefix]) => key === prefix || key.startsWith(`${prefix}.`))
 		.sort(([left], [right]) => right.length - left.length || (left < right ? -1 : left > right ? 1 : 0));
@@ -118,7 +116,7 @@ function resolveOwner(key: string, config: S11tProjectConfigV2, file: string): {
 }
 
 function resolveRequiredLocales(
-	config: S11tProjectConfigV2,
+	config: S11tProjectConfig,
 	releaseProfile: string,
 	file: string,
 ): string[] {
@@ -162,12 +160,12 @@ function parseTranslations(
 
 function parseVariables(
 	input: unknown,
-	config: S11tProjectConfigV2,
+	config: S11tProjectConfig,
 	file: string,
-): { definitions: Record<string, CanonicalVariableDefinitionV2>; origins: Record<string, string> } {
+): { definitions: Record<string, CanonicalVariableDefinition>; origins: Record<string, string> } {
 	if (input === undefined) return { definitions: {}, origins: {} };
 	const source = object(input, file, ["variables"]);
-	const definitions: Record<string, CanonicalVariableDefinitionV2> = {};
+	const definitions: Record<string, CanonicalVariableDefinition> = {};
 	const origins: Record<string, string> = {};
 	for (const [name, value] of Object.entries(source)) {
 		const path = ["variables", name] satisfies Path;
@@ -187,7 +185,7 @@ function parseVariables(
 			continue;
 		}
 		exactKeys(variable, ["type", "trust", "placement", "encoding"], ["type", "trust", "placement", "encoding"], file, path);
-		const definition: CanonicalVariableDefinitionV2 = {
+		const definition: CanonicalVariableDefinition = {
 			required: true,
 			type: oneOf(variable.type, ["string", "number", "boolean", "json"], file, [...path, "type"]),
 			trust: oneOf(variable.trust, ["trusted", "untrusted"], file, [...path, "trust"]),
@@ -197,15 +195,11 @@ function parseVariables(
 		if (definition.trust === "untrusted" && definition.encoding === "raw") {
 			issue(file, "S11T_UNSAFE_UNTRUSTED_RAW", "Untrusted variables cannot use raw encoding", [...path, "encoding"]);
 		}
-		if (
-			config.artifactVersion === 3 &&
-			definition.trust === "untrusted" &&
-			definition.placement !== "delimited-context"
-		) {
+		if (definition.trust === "untrusted" && definition.placement !== "delimited-context") {
 			issue(
 				file,
 				"S11T_UNSAFE_UNTRUSTED_PLACEMENT",
-				"Artifact v3 requires delimited-context placement for untrusted variables",
+				"Untrusted variables require delimited-context placement",
 				[...path, "placement"],
 			);
 		}
@@ -222,8 +216,8 @@ function parseVariables(
 }
 
 function validateVariableReferences(
-	sections: CanonicalSectionDefinitionV2[],
-	variables: Record<string, CanonicalVariableDefinitionV2>,
+	sections: CanonicalSectionDefinition[],
+	variables: Record<string, CanonicalVariableDefinition>,
 	file: string,
 ): void {
 	const referenced = new Set<string>();
@@ -250,7 +244,7 @@ function validateVariableReferences(
 }
 
 function validateCoverage(
-	sections: CanonicalSectionDefinitionV2[],
+	sections: CanonicalSectionDefinition[],
 	requiredLocales: string[],
 	file: string,
 	validateRequiredLocales = true,
@@ -274,9 +268,9 @@ function validateCoverage(
 function simpleSection(
 	text: unknown,
 	translations: unknown,
-	config: S11tProjectConfigV2,
+	config: S11tProjectConfig,
 	file: string,
-): CanonicalSectionDefinitionV2 {
+): CanonicalSectionDefinition {
 	return {
 		id: "context.text",
 		kind: "instruction",
@@ -297,9 +291,9 @@ function simpleSection(
 
 function parseSections(
 	input: unknown,
-	config: S11tProjectConfigV2,
+	config: S11tProjectConfig,
 	file: string,
-): CanonicalSectionDefinitionV2[] {
+): CanonicalSectionDefinition[] {
 	if (!Array.isArray(input) || input.length === 0) {
 		return issue(file, "S11T_SOURCE_INVALID", "Expected at least one section", ["sections"]);
 	}
@@ -337,14 +331,14 @@ function parseSections(
 	});
 }
 
-export function parseAndResolveAuthoringV2(
+export function parseAndResolveAuthoring(
 	input: unknown,
 	file: string,
 	sourcePath: string,
-	config: S11tProjectConfigV2,
+	config: S11tProjectConfig,
 	releaseProfile: string,
 	options: { validateRequiredCoverage?: boolean } = {},
-): ResolvedAuthoringDocumentV2 {
+): ResolvedAuthoringDocument {
 	const source = object(input, file, []);
 	exactKeys(source, ["key", "content_kind", "text", "translations", "variables", "sections"], [], file, []);
 	const pathKey = deriveKey(sourcePath, file);
@@ -395,71 +389,9 @@ export function parseAndResolveAuthoringV2(
 	};
 }
 
-export function adaptAuthoringV1ToV2(
-	document: AuthoringDocument,
-	sourcePath: string,
-	config: S11tProjectConfigV2,
-	releaseProfile: string,
-	options: { validateRequiredCoverage?: boolean } = {},
-): ResolvedAuthoringDocumentV2 {
-	const key = deriveKey(sourcePath, document.file);
-	const owner = resolveOwner(key, config, document.file);
-	if (document.definition.sourceLocale !== config.authoring.sourceLocale) {
-		issue(document.file, "S11T_LOCALE_RELABEL_FORBIDDEN", "v1 source_locale differs from project authoring.source_locale", ["context", "source_locale"]);
-	}
-	if (document.definition.owner !== owner.value) {
-		issue(document.file, "S11T_OWNER_UNRESOLVED", "v1 owner differs from the resolved keyspace owner", ["context", "owner"]);
-	}
-	const requiredLocales = resolveRequiredLocales(config, releaseProfile, document.file);
-	const sections = document.definition.sections.map((section) => ({ ...section, locales: { ...section.locales } }));
-	if (config.artifactVersion === 3) {
-		for (const [name, variable] of Object.entries(document.definition.variables)) {
-			if (
-				variable.trust === "untrusted" &&
-				variable.placement !== "delimited-context"
-			) {
-				issue(
-					document.file,
-					"S11T_UNSAFE_UNTRUSTED_PLACEMENT",
-					"Artifact v3 requires delimited-context placement for untrusted variables",
-					["variables", name, "placement"],
-				);
-			}
-		}
-	}
-	validateCoverage(
-		sections,
-		requiredLocales,
-		document.file,
-		options.validateRequiredCoverage !== false,
-	);
-	return {
-		file: document.file,
-		sourcePath,
-		definition: {
-			key,
-			owner: owner.value,
-			contentKind: "text",
-			sourceLocale: config.authoring.sourceLocale,
-			requiredLocales,
-			variables: document.definition.variables,
-			sections,
-		},
-		origins: {
-			key: `path:${sourcePath}`,
-			owner: owner.source,
-			contentKind: "v1 context.output -> built-in:text",
-			sourceLocale: "authoring.source_locale (verified against v1)",
-			requiredLocales: `release_profiles.${releaseProfile}`,
-			variables: Object.fromEntries(Object.keys(document.definition.variables).map((name) => [name, `${document.file}#variables.${name}`])),
-		},
-		legacyAlias: document.definition.id,
-	};
-}
-
-export function validateResolvedDocumentsV2(
-	documents: readonly ResolvedAuthoringDocumentV2[],
-	config: S11tProjectConfigV2,
+export function validateResolvedDocuments(
+	documents: readonly ResolvedAuthoringDocument[],
+	config: S11tProjectConfig,
 ): Record<string, string> {
 	const keys = new Map<string, string>();
 	const aliases: Record<string, string> = { ...config.keyAliases };
@@ -469,23 +401,6 @@ export function validateResolvedDocumentsV2(
 			issue(document.file, "S11T_KEY_COLLISION", `Context key is also defined in ${previous}`, ["key"]);
 		}
 		keys.set(document.definition.key, document.file);
-		if (document.legacyAlias !== undefined) {
-			const configuredTarget = Object.hasOwn(aliases, document.legacyAlias)
-				? aliases[document.legacyAlias]
-				: undefined;
-			if (
-				configuredTarget !== undefined &&
-				configuredTarget !== document.definition.key
-			) {
-				issue(
-					document.file,
-					"S11T_KEY_ALIAS_INVALID",
-					`Legacy alias ${document.legacyAlias} conflicts with configured target ${configuredTarget}`,
-					["context", "id"],
-				);
-			}
-			aliases[document.legacyAlias] = document.definition.key;
-		}
 	}
 	for (const [alias, target] of Object.entries(aliases)) {
 		if (alias === target || keys.has(alias) || !keys.has(target) || Object.hasOwn(aliases, target)) {

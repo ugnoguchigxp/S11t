@@ -26,10 +26,9 @@ export type CanonicalSectionDefinition = {
 };
 
 export type CanonicalContextDefinition = {
-	id: string;
-	version: string;
+	key: string;
 	owner: string;
-	output: "text";
+	contentKind: "text";
 	sourceLocale: string;
 	requiredLocales: string[];
 	variables: Record<string, CanonicalVariableDefinition>;

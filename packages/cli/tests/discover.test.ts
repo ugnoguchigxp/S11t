@@ -30,30 +30,36 @@ afterEach(() => {
 
 describe("source discovery", () => {
 	it("discovers nested files in stable POSIX order", () => {
-		const directory = temporaryFixture("valid/multilingual");
-		const source = readFileSync(join(directory, "contexts/greeting.context.toml"), "utf8");
-		mkdirSync(join(directory, "contexts/a"));
-		writeFileSync(
-			join(directory, "contexts/a/second.context.toml"),
-			source.replace('id = "example:greeting"', 'id = "example:second"'),
+		const directory = temporaryFixture("valid/content-first");
+		const source = readFileSync(
+			join(directory, "contexts/structuredGeneration/repair.context.toml"),
+			"utf8",
 		);
-		const project = loadProject(undefined, directory);
+		mkdirSync(join(directory, "contexts/structuredGeneration/a"));
+		writeFileSync(
+			join(directory, "contexts/structuredGeneration/a/second.context.toml"),
+			source,
+		);
+		const project = loadProject(undefined, directory, "production");
 		expect(project.sourceFiles).toEqual([
-			"contexts/a/second.context.toml",
-			"contexts/greeting.context.toml",
+			"contexts/structuredGeneration/a/second.context.toml",
+			"contexts/structuredGeneration/repair.context.toml",
 		]);
 	});
 
 	it("adds TOML line and column to syntax diagnostics", () => {
-		const directory = temporaryFixture("valid/simple");
-		writeFileSync(join(directory, "contexts/repair.context.toml"), "schema_version = [");
+		const directory = temporaryFixture("valid/content-first");
+		writeFileSync(
+			join(directory, "contexts/structuredGeneration/repair.context.toml"),
+			"text = [",
+		);
 		try {
-			loadProject(undefined, directory);
+			loadProject(undefined, directory, "production");
 		} catch (error) {
 			expect(error).toBeInstanceOf(S11tDiagnosticError);
 			const diagnostic = (error as S11tDiagnosticError).diagnostics[0];
 			expect(diagnostic).toEqual(
-				expect.objectContaining({ code: "S11T_TOML_SYNTAX", line: 1, column: 19 }),
+				expect.objectContaining({ code: "S11T_TOML_SYNTAX", line: 1, column: 9 }),
 			);
 			return;
 		}
@@ -61,14 +67,14 @@ describe("source discovery", () => {
 	});
 
 	it("rejects a source_dir that is a file", () => {
-		const directory = temporaryFixture("valid/simple");
+		const directory = temporaryFixture("valid/content-first");
 		writeFileSync(join(directory, "not-a-directory"), "text");
 		const configPath = join(directory, "s11t.config.toml");
 		writeFileSync(
 			configPath,
 			readFileSync(configPath, "utf8").replace('source_dir = "contexts"', 'source_dir = "not-a-directory"'),
 		);
-		expect(() => loadProject(undefined, directory)).toThrowError(
+		expect(() => loadProject(undefined, directory, "production")).toThrowError(
 			expect.objectContaining<S11tDiagnosticError>({
 				diagnostics: [expect.objectContaining({ code: "S11T_CONFIG_INVALID" })],
 			}),
@@ -76,15 +82,15 @@ describe("source discovery", () => {
 	});
 
 	it.skipIf(process.platform === "win32")("rejects source_dir symlinks outside the project", () => {
-		const directory = temporaryFixture("valid/simple");
-		const outside = temporaryFixture("valid/simple");
+		const directory = temporaryFixture("valid/content-first");
+		const outside = temporaryFixture("valid/content-first");
 		symlinkSync(join(outside, "contexts"), join(directory, "linked-contexts"), "dir");
 		const configPath = join(directory, "s11t.config.toml");
 		writeFileSync(
 			configPath,
 			readFileSync(configPath, "utf8").replace('source_dir = "contexts"', 'source_dir = "linked-contexts"'),
 		);
-		expect(() => loadProject(undefined, directory)).toThrowError(
+		expect(() => loadProject(undefined, directory, "production")).toThrowError(
 			expect.objectContaining<S11tDiagnosticError>({
 				diagnostics: [expect.objectContaining({ code: "S11T_CONFIG_INVALID" })],
 			}),

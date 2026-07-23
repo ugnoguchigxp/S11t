@@ -1,5 +1,20 @@
-schema_version = 1
 source_dir = "contexts"
 out_dir = ".s11t"
-required_locales = ["ja-JP", "en-US"]
-default_locale = "ja-JP"
+
+[authoring]
+source_locale = "ja-JP"
+
+[governance]
+require_owner = true
+
+[keyspaces.consumer]
+owner = "consumer"
+
+[release_profiles.development]
+required_locales = ["$source", "en-US"]
+
+[variable_profiles."untrusted.text"]
+type = "string"
+trust = "untrusted"
+placement = "delimited-context"
+encoding = "json-string"

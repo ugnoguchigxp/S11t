@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
 export const criticalCoverageRequirements = {
-	"packages/cli/src/authoring-v2.ts": {
+	"packages/cli/src/authoring.ts": {
 		statements: 80,
 		branches: 75,
 		functions: 80,
@@ -23,41 +23,35 @@ export const criticalCoverageRequirements = {
 		functions: 55,
 		lines: 84,
 	},
-	"packages/cli/src/migrate-command.ts": {
-		statements: 80,
-		branches: 68,
-		functions: 90,
-		lines: 82,
-	},
-	"packages/cli/src/migration/journal.ts": {
-		statements: 84,
-		branches: 70,
-		functions: 95,
-		lines: 84,
-	},
-	"packages/cli/src/migration/journal-manifest.ts": {
-		statements: 85,
-		branches: 90,
-		functions: 100,
-		lines: 90,
-	},
-	"packages/cli/src/migration/serialize-v2.ts": {
-		statements: 85,
-		branches: 80,
-		functions: 70,
-		lines: 90,
-	},
 	"packages/runtime/src/catalog-shared.ts": {
 		statements: 85,
 		branches: 80,
 		functions: 100,
 		lines: 85,
 	},
-	"packages/runtime/src/catalog-v2.ts": {
+	"packages/runtime/src/catalog.ts": {
 		statements: 80,
 		branches: 70,
 		functions: 85,
 		lines: 80,
+	},
+	"packages/runtime/src/artifact-schema.ts": {
+		statements: 80,
+		branches: 70,
+		functions: 85,
+		lines: 80,
+	},
+	"packages/runtime/src/compiler.ts": {
+		statements: 80,
+		branches: 70,
+		functions: 85,
+		lines: 80,
+	},
+	"packages/runtime/src/hash.ts": {
+		statements: 95,
+		branches: 75,
+		functions: 100,
+		lines: 95,
 	},
 };
 

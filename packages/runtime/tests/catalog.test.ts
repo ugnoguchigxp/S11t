@@ -1,42 +1,29 @@
 import { describe, expect, it } from "vitest";
 
-import { createCatalog } from "../src/catalog.js";
+import {
+	createCatalog,
+	hashRendered,
+	S11tError,
+	verifyRenderedHash,
+} from "../src/index.js";
 import { compileCatalog, type CanonicalContextDefinition } from "../src/compiler.js";
-import { S11tError } from "../src/diagnostics.js";
 
 function definition(): CanonicalContextDefinition {
 	return {
-		id: "codingAgent:identity",
-		version: "1.0.0",
+		key: "codingAgent.role-instructions",
 		owner: "coding-agent",
-		output: "text",
+		contentKind: "text",
 		sourceLocale: "ja-JP",
 		requiredLocales: ["ja-JP", "en-US"],
-		variables: {
-			taskGoal: {
-				required: true,
-				type: "string",
-				trust: "untrusted",
-				placement: "delimited-context",
-				encoding: "json-string",
-			},
-		},
+		variables: {},
 		sections: [
 			{
-				id: "role.identity",
+				id: "context.text",
 				kind: "instruction",
 				severity: "must",
 				enforcement: "prompt",
 				optimizable: false,
-				locales: { "ja-JP": "役割", "en-US": "Role" },
-			},
-			{
-				id: "task.goal",
-				kind: "runtime-fact",
-				severity: "should",
-				enforcement: "prompt",
-				optimizable: false,
-				locales: { "ja-JP": "目標: [[taskGoal]]", "en-US": "Goal: [[taskGoal]]" },
+				locales: { "ja-JP": "日本語", "en-US": "English" },
 			},
 		],
 	};
@@ -44,10 +31,52 @@ function definition(): CanonicalContextDefinition {
 
 function artifact() {
 	return compileCatalog([definition()], {
-		defaultLocale: "ja-JP",
+		releaseProfile: "production",
+		aliases: { "codingAgent.roleInstructions": "codingAgent.role-instructions" },
 		provenance: {
 			configPath: "s11t.config.toml",
-			sourceFiles: ["contexts/identity.context.toml"],
+			sourceFiles: ["contexts/codingAgent/role-instructions.context.toml"],
+		},
+	});
+}
+
+function definitionWithValue(): CanonicalContextDefinition {
+	const result = definition();
+	result.variables = {
+		value: {
+			required: true,
+			type: "string",
+			trust: "trusted",
+			placement: "inline",
+			encoding: "raw",
+		},
+	};
+	result.sections[0]!.locales = { "ja-JP": "値: [[value]]", "en-US": "Value: [[value]]" };
+	return result;
+}
+
+function japaneseOnlyArtifact() {
+	const japaneseOnly = definition();
+	japaneseOnly.requiredLocales = ["ja-JP"];
+	japaneseOnly.sections[0]!.locales = { "ja-JP": "日本語" };
+	return compileCatalog([japaneseOnly], {
+		releaseProfile: "development",
+		provenance: { configPath: "s11t.config.toml", sourceFiles: ["contexts/a.context.toml"] },
+	});
+}
+
+function compoundArtifact() {
+	const provider = definitionWithValue();
+	provider.key = "codingAgent.provider-prompt";
+	provider.sections[0]!.locales = {
+		"ja-JP": "Provider: [[value]]",
+		"en-US": "Provider: [[value]]",
+	};
+	return compileCatalog([definition(), provider], {
+		releaseProfile: "production",
+		provenance: {
+			configPath: "s11t.config.toml",
+			sourceFiles: ["contexts/role.context.toml", "contexts/provider.context.toml"],
 		},
 	});
 }
@@ -62,105 +91,323 @@ function errorCode(action: () => unknown): string {
 	throw new Error("Expected S11tError");
 }
 
-describe("createCatalog", () => {
-	it("validates digests and exposes immutable descriptions", () => {
-		const input = artifact();
-		const catalog = createCatalog(input, { expectedCatalogDigest: input.catalogDigest });
-		expect(catalog.list()).toEqual([
-			expect.objectContaining({ id: "codingAgent:identity", variableNames: ["taskGoal"] }),
-		]);
-		expect(Object.isFrozen(catalog.list())).toBe(true);
-		expect(Object.isFrozen(catalog.list()[0])).toBe(true);
-	});
+function errorDetails(action: () => unknown): { code: string; path: Array<string | number> } {
+	try {
+		action();
+	} catch (error) {
+		if (error instanceof S11tError) return { code: error.code, path: error.path };
+		throw error;
+	}
+	throw new Error("Expected S11tError");
+}
 
-	it("rejects expected digest mismatch and artifact tampering", () => {
-		const input = artifact();
-		expect(errorCode(() => createCatalog(input, { expectedCatalogDigest: `sha256:${"0".repeat(64)}` }))).toBe(
-			"S11T_ARTIFACT_DIGEST_MISMATCH",
-		);
-		input.contexts["codingAgent:identity"]!.locales["en-US"]!.sections[0]!.segments = [
-			{ type: "literal", value: "Tampered" },
-		];
-		expect(errorCode(() => createCatalog(input))).toBe("S11T_ARTIFACT_DIGEST_MISMATCH");
-	});
-
-	it("is unaffected by caller mutation after creation", () => {
-		const input = artifact();
-		const catalog = createCatalog(input);
-		const p = catalog.bind({ instructionLocale: "en-US" });
-		const before = p("codingAgent:identity", { taskGoal: "Ship" });
-		input.contexts["codingAgent:identity"]!.locales["en-US"]!.sections[0]!.segments = [];
-		const after = p("codingAgent:identity", { taskGoal: "Ship" });
-		expect(after).toEqual(before);
-		expect(Object.isFrozen(after)).toBe(true);
-		expect(Object.isFrozen(after.manifest.sectionIds)).toBe(true);
-	});
-});
-
-describe("bind and p", () => {
-	it("keeps locale binding request-scoped", async () => {
+describe("catalog", () => {
+	it("uses canonical dot keys while preserving a one-hop alias", () => {
 		const catalog = createCatalog(artifact());
-		const ja = catalog.bind({ instructionLocale: "ja-JP" });
-		const en = catalog.bind({ instructionLocale: "en-US" });
-		const [jaInvocation, enInvocation] = await Promise.all([
-			Promise.resolve(ja("codingAgent:identity", { taskGoal: "公開" })),
-			Promise.resolve(en("codingAgent:identity", { taskGoal: "Ship" })),
-		]);
-		expect(jaInvocation.content.text).toBe('役割\n目標: "公開"\n');
-		expect(enInvocation.content.text).toBe('Role\nGoal: "Ship"\n');
-	});
-
-	it("records explicit fallback in the manifest", () => {
-		const invocation = createCatalog(artifact())
-			.bind({ instructionLocale: "fr-FR", fallbackLocale: "en-US" })("codingAgent:identity", {
-				taskGoal: "Ship",
-			});
+		const invocation = catalog.bind({ instructionLocale: "ja-JP" })(
+			"codingAgent.roleInstructions",
+			{},
+		);
+		expect(invocation.content.text).toBe("日本語\n");
 		expect(invocation.manifest).toEqual(
 			expect.objectContaining({
-				requestedLocale: "fr-FR",
-				resolvedLocale: "en-US",
-				fallbackUsed: true,
-				sectionIds: ["role.identity", "task.goal"],
+				requestedKey: "codingAgent.roleInstructions",
+				resolvedKey: "codingAgent.role-instructions",
+				aliasUsed: true,
 			}),
 		);
+		expect(catalog.listAliases()).toEqual({
+			"codingAgent.roleInstructions": "codingAgent.role-instructions",
+		});
 	});
 
-	it("snapshots locale bindings instead of retaining caller-owned state", () => {
-		const binding: { instructionLocale: string; fallbackLocale?: string } = {
-			instructionLocale: "ja-JP",
-		};
-		const p = createCatalog(artifact()).bind(binding);
-		binding.instructionLocale = "en-US";
-		binding.fallbackLocale = "en-US";
-		expect(p("codingAgent:identity", { taskGoal: "公開" }).manifest).toEqual(
-			expect.objectContaining({ requestedLocale: "ja-JP", resolvedLocale: "ja-JP" }),
-		);
-	});
-
-	it("rejects missing locale, missing value, extra value and unknown key", () => {
+	it("lists and describes immutable contexts through canonical keys and aliases", () => {
 		const catalog = createCatalog(artifact());
-		expect(
-			errorCode(() => catalog.bind({ instructionLocale: "fr-FR" })("codingAgent:identity", { taskGoal: "x" })),
-		).toBe("S11T_LOCALE_NOT_FOUND");
-		const p = catalog.bind({ instructionLocale: "en-US" });
-		expect(errorCode(() => p("codingAgent:identity", {}))).toBe("S11T_VALUE_MISSING");
-		expect(errorCode(() => p("codingAgent:identity", { taskGoal: "x", extra: true }))).toBe(
-			"S11T_VALUE_EXTRA",
-		);
-		expect(errorCode(() => p("missing:key", {}))).toBe("S11T_CONTEXT_NOT_FOUND");
+		const descriptions = catalog.list();
+		expect(descriptions).toEqual([
+			expect.objectContaining({
+				key: "codingAgent.role-instructions",
+				availableLocales: ["en-US", "ja-JP"],
+			}),
+		]);
+		expect(catalog.describe("codingAgent.role-instructions")).toBe(descriptions[0]);
+		expect(catalog.describe("codingAgent.roleInstructions")).toBe(descriptions[0]);
+		expect(Object.isFrozen(descriptions)).toBe(true);
+		expect(errorCode(() => catalog.describe("missing.context"))).toBe("S11T_CONTEXT_NOT_FOUND");
 	});
 
-	it("treats prototype property names as missing keys and locales", () => {
+	it("keeps language switching at the top-level binding and snapshots language variables", () => {
 		const catalog = createCatalog(artifact());
-		expect(errorCode(() => catalog.bind({ instructionLocale: "en-US" })("constructor", {}))).toBe(
-			"S11T_CONTEXT_NOT_FOUND",
+		let topLevelLanguage: "ja" | "en" = "ja";
+		const instructionLocale = () => (topLevelLanguage === "en" ? "en-US" : "ja-JP");
+		const ja = catalog.bind({ instructionLocale: instructionLocale() });
+
+		topLevelLanguage = "en";
+		const en = catalog.bind({ instructionLocale: instructionLocale() });
+
+		expect(ja("codingAgent.role-instructions", {}).content.text).toBe("日本語\n");
+		expect(en("codingAgent.role-instructions", {}).content.text).toBe("English\n");
+		expect(ja("codingAgent.role-instructions", {}).manifest.requestedLocale).toBe("ja-JP");
+		expect(en("codingAgent.role-instructions", {}).manifest.requestedLocale).toBe("en-US");
+	});
+
+	it("uses ordered explicit fallbacks and rejects invalid binding state", () => {
+		const catalog = createCatalog(japaneseOnlyArtifact());
+		const invocation = catalog.bind({
+			instructionLocale: "en-US",
+			fallbackLocales: ["ja-JP"],
+		})("codingAgent.role-instructions", {});
+		expect(invocation.manifest).toEqual(
+			expect.objectContaining({
+				requestedLocale: "en-US",
+				fallbackLocales: ["ja-JP"],
+				resolvedLocale: "ja-JP",
+				fallbackUsed: true,
+			}),
 		);
 		expect(
 			errorCode(() =>
-				catalog.bind({ instructionLocale: "constructor" })("codingAgent:identity", {
-					taskGoal: "x",
-				}),
+				catalog.bind({ instructionLocale: "ja-JP", fallbackLocales: ["ja-JP"] }),
+			),
+		).toBe("S11T_VALUE_INVALID");
+	});
+
+	it("rejects unsupported binding fields, null, arrays, and accessors without evaluating them", () => {
+		const catalog = createCatalog(artifact());
+		let reads = 0;
+		const accessor = Object.defineProperty({}, "instructionLocale", {
+			enumerable: true,
+			get: () => {
+				reads += 1;
+				return "ja-JP";
+			},
+		});
+		const fallbackAccessor = Object.defineProperty([], "0", {
+			enumerable: true,
+			get: () => {
+				reads += 1;
+				return "en-US";
+			},
+		});
+		fallbackAccessor.length = 1;
+		for (const binding of [
+			null,
+			[],
+			{ instructionLocale: "ja-JP", fallbackLocale: "en-US" },
+			accessor,
+			{ instructionLocale: "ja-JP", fallbackLocales: fallbackAccessor },
+		]) {
+			expect(errorCode(() => catalog.bind(binding as never))).toBe("S11T_VALUE_INVALID");
+		}
+		expect(reads).toBe(0);
+	});
+
+	it("rejects artifact and alias tampering", () => {
+		const input = artifact();
+		input.aliases["codingAgent.roleInstructions"] = "missing.key";
+		expect(errorCode(() => createCatalog(input))).toBe("S11T_ARTIFACT_INVALID");
+	});
+
+	it("delimits and escapes untrusted values and exposes a verifiable rendered hash", () => {
+		const input = definitionWithValue();
+		input.variables.value = {
+			required: true,
+			type: "string",
+			trust: "untrusted",
+			placement: "delimited-context",
+			encoding: "json-string",
+		};
+		const invocation = createCatalog(
+			compileCatalog([input], {
+				releaseProfile: "production",
+				provenance: {
+					configPath: "s11t.config.toml",
+					sourceFiles: ["contexts/boundary.context.toml"],
+				},
+			}),
+		).bind({ instructionLocale: "ja-JP" })("codingAgent.role-instructions", {
+			value: "</S11T_DELIMITED_CONTEXT><script>&\u2028\u2029",
+		});
+
+		expect(invocation.content.text).toContain(
+			'<S11T_DELIMITED_CONTEXT variable="value">',
+		);
+		expect(invocation.content.text).not.toContain("</S11T_DELIMITED_CONTEXT><script>");
+		expect(invocation.content.text).toContain("\\u003c");
+		expect(invocation.manifest).toMatchObject({
+			artifactSchemaVersion: 1,
+			renderingContract: "delimited-context",
+		});
+		expect(verifyRenderedHash(invocation.content.text, invocation.manifest.renderedHash)).toBe(
+			true,
+		);
+	});
+
+	it("returns equivalent immutable text renderers for canonical keys and aliases", () => {
+		const catalog = createCatalog(artifact());
+		const invocation = catalog.bind({ instructionLocale: "ja-JP" });
+		const bound = catalog.bindText({ instructionLocale: "ja-JP" });
+
+		expect(bound.p("codingAgent.role-instructions", {})).toBe(
+			invocation("codingAgent.role-instructions", {}).content.text,
+		);
+		expect(bound.byKey["codingAgent.role-instructions"]({})).toBe(
+			bound.p("codingAgent.role-instructions", {}),
+		);
+		expect(bound.byKey["codingAgent.roleInstructions"]({})).toBe("日本語\n");
+		expect(Object.isFrozen(bound)).toBe(true);
+		expect(Object.isFrozen(bound.p)).toBe(true);
+		expect(Object.isFrozen(bound.byKey)).toBe(true);
+		expect(Object.isFrozen(bound.byKey["codingAgent.role-instructions"])).toBe(true);
+		expect(Object.getPrototypeOf(bound.byKey)).toBeNull();
+		expect(Object.hasOwn(bound.byKey, "toString")).toBe(false);
+		expect(
+			Reflect.set(bound.byKey as unknown as Record<string, unknown>, "unexpected", () => ""),
+		).toBe(false);
+	});
+
+	it("clones fixed bindings and keeps a request snapshot stable", () => {
+		const catalog = createCatalog(japaneseOnlyArtifact());
+		const fallbackLocales = ["ja-JP"];
+		const bound = catalog.bindText({ instructionLocale: "en-US", fallbackLocales });
+		fallbackLocales.length = 0;
+
+		expect(bound.p("codingAgent.role-instructions", {})).toBe("日本語\n");
+	});
+
+	it("binds text and invocations to one immutable request audit snapshot", () => {
+		const catalog = createCatalog(compoundArtifact());
+		const fallbackLocales = ["en-US"];
+		const request = catalog.bindRequest({
+			instructionLocale: "ja-JP",
+			fallbackLocales,
+		});
+		fallbackLocales.length = 0;
+
+		const role = request.p("codingAgent.role-instructions", {});
+		expect(request.byKey["codingAgent.role-instructions"]({})).toBe(role);
+		const final = request.invoke("codingAgent.provider-prompt", {
+			value: role.trimEnd(),
+		});
+		const audit = request.finalize(final);
+
+		expect(audit.binding).toEqual({
+			instructionLocale: "ja-JP",
+			fallbackLocales: ["en-US"],
+		});
+		expect(audit.finalManifest).toBe(final.manifest);
+		expect(audit.renderTrace.map(({ index, via, manifest }) => ({
+			index,
+			via,
+			key: manifest.requestedKey,
+		}))).toEqual([
+			{ index: 0, via: "p", key: "codingAgent.role-instructions" },
+			{ index: 1, via: "byKey", key: "codingAgent.role-instructions" },
+			{ index: 2, via: "invoke", key: "codingAgent.provider-prompt" },
+		]);
+		expect(Object.isFrozen(request)).toBe(true);
+		expect(Object.isFrozen(request.binding)).toBe(true);
+		expect(Object.isFrozen(request.finalize)).toBe(true);
+		expect(Object.isFrozen(audit)).toBe(true);
+		expect(Object.isFrozen(audit.renderTrace)).toBe(true);
+		expect(Object.isFrozen(audit.renderTrace[0])).toBe(true);
+		expect(() => request.p("codingAgent.role-instructions", {})).toThrowError(
+			expect.objectContaining<S11tError>({ code: "S11T_VALUE_INVALID" }),
+		);
+	});
+
+	it("finalizes only the latest invocation from the same request", () => {
+		const catalog = createCatalog(compoundArtifact());
+		const first = catalog.bindRequest({ instructionLocale: "ja-JP" });
+		const second = catalog.bindRequest({ instructionLocale: "ja-JP" });
+		const firstInvocation = first.invoke("codingAgent.role-instructions", {});
+		const secondInvocation = second.invoke("codingAgent.role-instructions", {});
+
+		expect(() => first.finalize(secondInvocation)).toThrowError(
+			expect.objectContaining<S11tError>({ code: "S11T_VALUE_INVALID" }),
+		);
+		const later = first.invoke("codingAgent.role-instructions", {});
+		expect(() => first.finalize(firstInvocation)).toThrowError(
+			expect.objectContaining<S11tError>({ code: "S11T_VALUE_INVALID" }),
+		);
+		expect(first.finalize(later).finalManifest).toBe(later.manifest);
+	});
+
+	it("exports rendered hash helpers from the package root", () => {
+		const text = "Provider prompt\n";
+		const digest = hashRendered(text);
+		expect(verifyRenderedHash(text, digest)).toBe(true);
+		expect(verifyRenderedHash(`${text}changed`, digest)).toBe(false);
+	});
+
+	it("evaluates a live binding resolver exactly once per call and reflects language changes", () => {
+		const catalog = createCatalog(artifact());
+		let language: "ja" | "en" = "ja";
+		let resolverCalls = 0;
+		const p = catalog.createTextRenderer(() => {
+			resolverCalls += 1;
+			return { instructionLocale: language === "ja" ? "ja-JP" : "en-US" };
+		});
+		const fixed = catalog.bindText({ instructionLocale: "ja-JP" });
+
+		expect(resolverCalls).toBe(0);
+		expect(p("codingAgent.role-instructions", {})).toBe("日本語\n");
+		expect(resolverCalls).toBe(1);
+		language = "en";
+		expect(p("codingAgent.role-instructions", {})).toBe("English\n");
+		expect(resolverCalls).toBe(2);
+		expect(fixed.p("codingAgent.role-instructions", {})).toBe("日本語\n");
+
+		const failure = new Error("settings unavailable");
+		const failing = catalog.createTextRenderer(() => {
+			throw failure;
+		});
+		expect(() => failing("codingAgent.role-instructions", {})).toThrow(failure);
+	});
+
+	it("uses only explicit fallbacks for text renderers", () => {
+		const catalog = createCatalog(japaneseOnlyArtifact());
+		expect(
+			catalog.bindText({ instructionLocale: "en-US", fallbackLocales: ["ja-JP"] }).p(
+				"codingAgent.role-instructions",
+				{},
+			),
+		).toBe("日本語\n");
+		expect(
+			errorCode(() =>
+				catalog
+					.bindText({ instructionLocale: "en-US" })
+					.p("codingAgent.role-instructions", {}),
 			),
 		).toBe("S11T_LOCALE_NOT_FOUND");
+	});
+
+	it("preserves bind error codes and paths in text-only adapters", () => {
+		const valuesCatalog = createCatalog(
+			compileCatalog([definitionWithValue()], {
+				releaseProfile: "production",
+				provenance: { configPath: "s11t.config.toml", sourceFiles: ["contexts/a.context.toml"] },
+			}),
+		);
+		const invocation = valuesCatalog.bind({ instructionLocale: "ja-JP" }) as (
+			key: string,
+			values: Record<string, unknown>,
+		) => unknown;
+		const text = valuesCatalog.bindText({ instructionLocale: "ja-JP" }).p as (
+			key: string,
+			values: Record<string, unknown>,
+		) => string;
+		for (const [key, values] of [
+			["codingAgent.role-instructions", {}],
+			["codingAgent.role-instructions", { value: "ok", extra: true }],
+			["unknown.context", { value: "ok" }],
+		] as const) {
+			expect(errorDetails(() => text(key, values))).toEqual(
+				errorDetails(() => invocation(key, values)),
+			);
+		}
+		expect(
+			errorDetails(() => valuesCatalog.bindText({ instructionLocale: "invalid locale" })),
+		).toEqual(errorDetails(() => valuesCatalog.bind({ instructionLocale: "invalid locale" })));
 	});
 });

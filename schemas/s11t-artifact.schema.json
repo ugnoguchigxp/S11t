@@ -1,23 +1,28 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://s11t.dev/schemas/s11t-artifact-v1.schema.json",
-  "title": "S11t catalog artifact v1",
+  "$id": "https://s11t.dev/schemas/s11t-artifact.schema.json",
+  "title": "S11t catalog artifact",
   "type": "object",
   "additionalProperties": false,
   "required": [
     "format",
     "schemaVersion",
     "compilerVersion",
-    "defaultLocale",
+    "releaseProfile",
+    "policyDigest",
+    "renderingContract",
     "createdFrom",
     "contexts",
+    "aliases",
     "catalogDigest"
   ],
   "properties": {
     "format": { "const": "s11t.catalog" },
     "schemaVersion": { "const": 1 },
     "compilerVersion": { "type": "string", "minLength": 1 },
-    "defaultLocale": { "type": "string", "minLength": 1 },
+    "releaseProfile": { "type": "string", "minLength": 1 },
+    "policyDigest": { "$ref": "#/$defs/digest" },
+    "renderingContract": { "const": "delimited-context" },
     "createdFrom": {
       "type": "object",
       "additionalProperties": false,
@@ -32,7 +37,13 @@
     },
     "contexts": {
       "type": "object",
+      "propertyNames": { "$ref": "#/$defs/dotKey" },
       "additionalProperties": { "$ref": "#/$defs/context" }
+    },
+    "aliases": {
+      "type": "object",
+      "propertyNames": { "$ref": "#/$defs/aliasKey" },
+      "additionalProperties": { "$ref": "#/$defs/dotKey" }
     },
     "catalogDigest": { "$ref": "#/$defs/digest" }
   },
@@ -40,6 +51,14 @@
     "digest": {
       "type": "string",
       "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "dotKey": {
+      "type": "string",
+      "pattern": "^[A-Za-z][A-Za-z0-9_-]*(?:\\.[A-Za-z][A-Za-z0-9_-]*)*$"
+    },
+    "aliasKey": {
+      "type": "string",
+      "pattern": "^[A-Za-z][A-Za-z0-9_-]*(?:\\.[A-Za-z][A-Za-z0-9_-]*)*$"
     },
     "relativePath": {
       "type": "string",
@@ -68,12 +87,16 @@
           }
         },
         {
-          "if": { "required": ["encoding"], "properties": { "encoding": { "const": "raw" } } },
-          "then": { "required": ["type"], "properties": { "type": { "const": "string" } } }
+          "if": { "properties": { "encoding": { "const": "raw" } }, "required": ["encoding"] },
+          "then": { "properties": { "type": { "const": "string" } }, "required": ["type"] }
         },
         {
-          "if": { "required": ["encoding"], "properties": { "encoding": { "const": "json-string" } } },
-          "then": { "required": ["type"], "properties": { "type": { "enum": ["string", "number", "boolean"] } } }
+          "if": { "properties": { "encoding": { "const": "json-string" } }, "required": ["encoding"] },
+          "then": { "properties": { "type": { "enum": ["string", "number", "boolean"] } }, "required": ["type"] }
+        },
+        {
+          "if": { "properties": { "trust": { "const": "untrusted" } }, "required": ["trust"] },
+          "then": { "properties": { "placement": { "const": "delimited-context" } }, "required": ["placement"] }
         }
       ]
     },
@@ -94,7 +117,7 @@
           "required": ["type", "name"],
           "properties": {
             "type": { "const": "variable" },
-            "name": { "type": "string", "minLength": 1 }
+            "name": { "$ref": "#/$defs/variableName" }
           }
         }
       ]
@@ -105,9 +128,7 @@
       "required": ["id", "kind", "severity", "enforcement", "optimizable", "segments"],
       "properties": {
         "id": { "type": "string", "minLength": 1 },
-        "kind": {
-          "enum": ["instruction", "runtime-fact", "tool-contract", "output-contract", "overlay"]
-        },
+        "kind": { "enum": ["instruction", "runtime-fact", "tool-contract", "output-contract", "overlay"] },
         "severity": { "enum": ["must", "should", "may"] },
         "enforcement": { "enum": ["prompt", "schema", "host"] },
         "optimizable": { "type": "boolean" },
@@ -134,10 +155,9 @@
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "id",
-        "version",
+        "key",
         "owner",
-        "output",
+        "contentKind",
         "sourceLocale",
         "requiredLocales",
         "variables",
@@ -146,29 +166,38 @@
         "releaseDigest"
       ],
       "properties": {
-        "id": { "type": "string", "minLength": 1 },
-        "version": { "type": "string", "minLength": 1 },
+        "key": { "$ref": "#/$defs/dotKey" },
         "owner": { "type": "string", "minLength": 1 },
-        "output": { "const": "text" },
-        "sourceLocale": { "type": "string", "minLength": 1 },
+        "contentKind": { "const": "text" },
+        "sourceLocale": { "$ref": "#/$defs/localeId" },
         "requiredLocales": {
           "type": "array",
           "minItems": 1,
           "uniqueItems": true,
-          "items": { "type": "string", "minLength": 1 }
+          "items": { "$ref": "#/$defs/localeId" }
         },
         "variables": {
           "type": "object",
+          "propertyNames": { "$ref": "#/$defs/variableName" },
           "additionalProperties": { "$ref": "#/$defs/variable" }
         },
         "locales": {
           "type": "object",
           "minProperties": 1,
+          "propertyNames": { "$ref": "#/$defs/localeId" },
           "additionalProperties": { "$ref": "#/$defs/locale" }
         },
         "definitionHash": { "$ref": "#/$defs/digest" },
         "releaseDigest": { "$ref": "#/$defs/digest" }
       }
+    },
+    "localeId": {
+      "type": "string",
+      "pattern": "^[A-Za-z]{2,8}(?:-[A-Za-z0-9]{1,8})*$"
+    },
+    "variableName": {
+      "type": "string",
+      "pattern": "^[A-Za-z][A-Za-z0-9_]*$"
     }
   }
 }

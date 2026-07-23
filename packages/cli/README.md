@@ -1,38 +1,23 @@
 # @s11t/cli
 
-The S11t command-line interface owns TOML loading, authoring validation, deterministic compilation, type generation, and artifact emission.
+The S11t CLI owns TOML loading, authoring validation, deterministic compilation, type generation, and
+artifact emission.
 
 ```sh
 npm install --save-dev @s11t/cli
 ```
 
 ```sh
-s11t lint [--config s11t.config.toml] [--release-profile name] [--format human|json]
-s11t build [--config s11t.config.toml] [--release-profile name] [--check] [--format human|json]
-s11t inspect key [--resolved] [--locale ja-JP] [--release-profile name] [--format human|json]
+s11t lint [--config s11t.config.toml] --release-profile name [--format human|json]
+s11t build [--config s11t.config.toml] --release-profile name [--check] [--format human|json]
+s11t inspect key [--resolved] [--locale ja-JP] --release-profile name [--format human|json]
 s11t inspect --coverage --locale en-US [--fallback-locale ja-JP] --release-profile name [--format human|json]
-s11t migrate authoring-v2 [--write | --restore operation-id | --list | --purge operation-id] [--config s11t.config.toml] [--format human|json]
 ```
 
-Config v1 continues to build artifact v1 unchanged. Config v2 uses content-first source files, derives
-canonical dot keys from their paths, resolves locale/owner/variable policy at project level, and requires an
-explicit release profile for lint, build, and inspect.
+Sources are content-first. The CLI derives canonical dot keys from paths, resolves locale, owner, and
+variable policy at project level, and always requires an explicit release profile.
 
-Config schema/authoring version 2 may select `artifact_version = 2` for byte-compatible metadata-only
-placement or `artifact_version = 3` for the `delimited-context-v1` runtime boundary.
+Coverage inspection reports canonical keys as `direct`, ordered explicit `fallback`, or `missing`.
+It never adds the source locale implicitly and does not change build policy.
 
-Coverage inspection reports canonical context keys as `direct`, ordered explicit `fallback`, or `missing`.
-It never adds the source locale implicitly and does not change `build --check` or release-profile policy.
-Missing target or required-profile coverage is returned in the JSON report; invalid source/configuration
-still fails normally.
-
-Migration is a dry-run by default. `--write` creates checksummed backups and returns an operation ID;
-`--restore` uses that ID and refuses to overwrite files changed after migration. Migration and restore
-preserve the original POSIX file permissions. `--list` reports retained journals, while `--purge` removes
-only a completed or restored journal; a prepared operation must be restored first. Journal contents are
-ignored by Git through `.s11t/migrations/.gitignore`.
-
-Start new catalogs with the
-[v2 guide](https://github.com/ugnoguchigxp/S11t/blob/main/docs/guides/getting-started.md). Existing v1
-catalogs can use the dry-run-first
-[migration guide](https://github.com/ugnoguchigxp/S11t/blob/main/docs/guides/migrating-v1-to-v2.md).
+See the [getting-started guide](https://github.com/ugnoguchigxp/S11t/blob/main/docs/guides/getting-started.md).

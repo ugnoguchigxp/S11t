@@ -1,5 +1,5 @@
-import { assertCatalogArtifactV1 } from "./artifact-schema.js";
-import { assertCatalogIntegrityV1 } from "./catalog.js";
+import { assertCatalogArtifact } from "./artifact-schema.js";
+import { assertCatalogIntegrity } from "./catalog.js";
 import type {
 	CanonicalContextDefinition,
 	CanonicalSectionDefinition,
@@ -9,12 +9,14 @@ import {
 	hashArtifact,
 	hashCatalog,
 	hashDefinition,
+	hashPolicy,
 	hashRelease,
 } from "./hash.js";
 import type {
-	S11tCatalogArtifactV1,
-	S11tCompiledContextV1,
-	S11tCompiledSectionV1,
+	S11tCatalogArtifact,
+	S11tCompiledContext,
+	S11tCompiledSection,
+	S11tRenderingContract,
 	TemplateSegment,
 } from "./types.js";
 import { COMPILER_VERSION } from "./version.js";
@@ -26,18 +28,12 @@ export type {
 } from "./canonical-definition.js";
 
 export { COMPILER_VERSION } from "./version.js";
-export { compileCatalogV2 } from "./compiler-v2.js";
-export { compileCatalogV3, RENDERING_CONTRACT_V3 } from "./compiler-v3.js";
-export type {
-	CanonicalContextDefinitionV2,
-	CanonicalSectionDefinitionV2,
-	CanonicalVariableDefinitionV2,
-	CompileCatalogV2Options,
-} from "./compiler-v2.js";
-export type { CompileCatalogV3Options } from "./compiler-v3.js";
+
+export const RENDERING_CONTRACT: S11tRenderingContract = "delimited-context";
 
 export type CompileCatalogOptions = {
-	defaultLocale: string;
+	releaseProfile: string;
+	aliases?: Record<string, string>;
 	provenance: {
 		configPath: string;
 		sourceFiles: string[];
@@ -69,12 +65,13 @@ export function tokenizeTemplate(text: string): TemplateSegment[] {
 	return segments;
 }
 
-function normalizedDefinition(definition: CanonicalContextDefinition): CanonicalContextDefinition {
+function normalizedDefinition(
+	definition: CanonicalContextDefinition,
+): CanonicalContextDefinition {
 	return {
-		id: definition.id,
-		version: definition.version,
+		key: definition.key,
 		owner: definition.owner,
-		output: definition.output,
+		contentKind: "text",
 		sourceLocale: definition.sourceLocale,
 		requiredLocales: [...definition.requiredLocales],
 		variables: Object.fromEntries(
@@ -109,10 +106,12 @@ function normalizedDefinition(definition: CanonicalContextDefinition): Canonical
 function compileSections(
 	sections: CanonicalSectionDefinition[],
 	locale: string,
-): S11tCompiledSectionV1[] {
+): S11tCompiledSection[] {
 	return sections.map((section) => {
 		const text = section.locales[locale];
-		if (text === undefined) throw new TypeError(`Missing locale ${locale} in section ${section.id}`);
+		if (text === undefined) {
+			throw new TypeError(`Missing locale ${locale} in section ${section.id}`);
+		}
 		return {
 			id: section.id,
 			kind: section.kind,
@@ -124,35 +123,37 @@ function compileSections(
 	});
 }
 
-function compileContext(definitionInput: CanonicalContextDefinition): S11tCompiledContextV1 {
+function compileContext(definitionInput: CanonicalContextDefinition): S11tCompiledContext {
 	const definition = normalizedDefinition(definitionInput);
-	const definitionHash = hashDefinition(definition);
+	const definitionHash = hashDefinition(definition, RENDERING_CONTRACT);
 	const artifactHashes: Record<string, string> = {};
 	const availableLocales = [
 		...new Set(definition.sections.flatMap((section) => Object.keys(section.locales))),
 	].sort(compareCodeUnits);
 	const locales = Object.fromEntries(
-		availableLocales
-			.map((locale) => {
-				const sections = compileSections(definition.sections, locale);
-				const artifactHash = hashArtifact({ id: definition.id, locale, sections });
-				artifactHashes[locale] = artifactHash;
-				return [locale, { sections, artifactHash }];
-			}),
+		availableLocales.map((locale) => {
+			const sections = compileSections(definition.sections, locale);
+			const artifactHash = hashArtifact({
+				key: definition.key,
+				locale,
+				sections,
+				renderingContract: RENDERING_CONTRACT,
+			});
+			artifactHashes[locale] = artifactHash;
+			return [locale, { sections, artifactHash }];
+		}),
 	);
 	const releaseDigest = hashRelease({
-		id: definition.id,
-		version: definition.version,
-		schemaVersion: 1,
+		key: definition.key,
 		compilerVersion: COMPILER_VERSION,
 		definitionHash,
 		artifactHashes,
+		renderingContract: RENDERING_CONTRACT,
 	});
 	return {
-		id: definition.id,
-		version: definition.version,
+		key: definition.key,
 		owner: definition.owner,
-		output: "text",
+		contentKind: "text",
 		sourceLocale: definition.sourceLocale,
 		requiredLocales: [...definition.requiredLocales],
 		variables: definition.variables,
@@ -162,41 +163,72 @@ function compileContext(definitionInput: CanonicalContextDefinition): S11tCompil
 	};
 }
 
+function validateAliases(
+	aliases: Record<string, string>,
+	contexts: Record<string, S11tCompiledContext>,
+): void {
+	for (const [alias, target] of Object.entries(aliases)) {
+		if (alias === target || Object.hasOwn(contexts, alias) || !Object.hasOwn(contexts, target)) {
+			throw new TypeError(`Invalid context alias: ${alias} -> ${target}`);
+		}
+		if (Object.hasOwn(aliases, target)) {
+			throw new TypeError(`Context alias chains are not supported: ${alias} -> ${target}`);
+		}
+	}
+}
+
 export function compileCatalog(
 	canonicalDefinitions: readonly CanonicalContextDefinition[],
 	options: CompileCatalogOptions,
-): S11tCatalogArtifactV1 {
+): S11tCatalogArtifact {
 	const definitions = [...canonicalDefinitions].sort((left, right) =>
-		compareCodeUnits(left.id, right.id),
+		compareCodeUnits(left.key, right.key),
 	);
-	const contexts: Record<string, S11tCompiledContextV1> = {};
+	const contexts: Record<string, S11tCompiledContext> = {};
 	const releaseDigests: Record<string, string> = {};
+	const requiredLocales: Record<string, string[]> = {};
 	for (const definition of definitions) {
-		if (Object.hasOwn(contexts, definition.id)) {
-			throw new TypeError(`Duplicate context ID: ${definition.id}`);
+		if (Object.hasOwn(contexts, definition.key)) {
+			throw new TypeError(`Duplicate context key: ${definition.key}`);
 		}
 		const context = compileContext(definition);
-		contexts[definition.id] = context;
-		releaseDigests[definition.id] = context.releaseDigest;
+		contexts[definition.key] = context;
+		releaseDigests[definition.key] = context.releaseDigest;
+		requiredLocales[definition.key] = [...context.requiredLocales];
 	}
-	const artifact: S11tCatalogArtifactV1 = {
+	const aliases = Object.fromEntries(
+		Object.entries(options.aliases ?? {}).sort(([left], [right]) =>
+			compareCodeUnits(left, right),
+		),
+	);
+	validateAliases(aliases, contexts);
+	const policyDigest = hashPolicy({
+		releaseProfile: options.releaseProfile,
+		requiredLocales,
+		renderingContract: RENDERING_CONTRACT,
+	});
+	const artifact: S11tCatalogArtifact = {
 		format: "s11t.catalog",
 		schemaVersion: 1,
 		compilerVersion: COMPILER_VERSION,
-		defaultLocale: options.defaultLocale,
+		releaseProfile: options.releaseProfile,
+		policyDigest,
+		renderingContract: RENDERING_CONTRACT,
 		createdFrom: {
 			configPath: options.provenance.configPath,
 			sourceFiles: [...options.provenance.sourceFiles].sort(compareCodeUnits),
 		},
 		contexts,
+		aliases,
 		catalogDigest: hashCatalog({
-			schemaVersion: 1,
 			compilerVersion: COMPILER_VERSION,
-			defaultLocale: options.defaultLocale,
+			policyDigest,
 			releaseDigests,
+			aliases,
+			renderingContract: RENDERING_CONTRACT,
 		}),
 	};
-	assertCatalogArtifactV1(artifact);
-	assertCatalogIntegrityV1(artifact);
+	assertCatalogArtifact(artifact);
+	assertCatalogIntegrity(artifact);
 	return artifact;
 }

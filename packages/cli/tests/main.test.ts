@@ -1,4 +1,4 @@
-import { cpSync, mkdtempSync, rmSync } from "node:fs";
+import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -36,11 +36,21 @@ function execute(arguments_: string[], cwd: string) {
 
 describe("CLI", () => {
 	it("lints valid sources and emits machine-readable invalid diagnostics", () => {
-		const valid = execute(["lint"], temporaryFixture("valid/simple"));
+		const validDirectory = temporaryFixture("valid/content-first");
+		const valid = execute(["lint", "--release-profile", "production"], validDirectory);
 		expect(valid).toEqual(expect.objectContaining({ code: 0, stderr: "" }));
+		const sourcePath = join(
+			validDirectory,
+			"contexts/structuredGeneration/repair.context.toml",
+		);
+		writeFileSync(
+			sourcePath,
+			readFileSync(sourcePath, "utf8")
+				.replace("profile = \"trusted.block\"", "type = \"string\"\ntrust = \"untrusted\"\nplacement = \"inline\"\nencoding = \"raw\""),
+		);
 		const invalid = execute(
-			["lint", "--format", "json"],
-			temporaryFixture("invalid/unsafe-untrusted-raw"),
+			["lint", "--release-profile", "production", "--format", "json"],
+			validDirectory,
 		);
 		expect(invalid.code).toBe(1);
 		expect(JSON.parse(invalid.stderr)[0]).toEqual(
@@ -49,26 +59,35 @@ describe("CLI", () => {
 	});
 
 	it("builds, checks and inspects compiled segments", () => {
-		const directory = temporaryFixture("valid/sectioned");
-		expect(execute(["build"], directory).code).toBe(0);
-		expect(execute(["build", "--check"], directory).code).toBe(0);
+		const directory = temporaryFixture("valid/content-first");
+		expect(execute(["build", "--release-profile", "production"], directory).code).toBe(0);
+		expect(execute(["build", "--release-profile", "production", "--check"], directory).code).toBe(0);
 		const inspected = execute(
-			["inspect", "codingAgent:identity", "--locale", "en-US", "--format", "json"],
+			[
+				"inspect",
+				"structuredGeneration.repair",
+				"--locale",
+				"en-US",
+				"--release-profile",
+				"production",
+				"--format",
+				"json",
+			],
 			directory,
 		);
 		expect(inspected.code).toBe(0);
 		expect(JSON.parse(inspected.stdout)).toEqual(
 			expect.objectContaining({
-				id: "codingAgent:identity",
+				key: "structuredGeneration.repair",
 				locale: "en-US",
 				sections: expect.arrayContaining([
-					expect.objectContaining({ id: "task.goal-context", segments: expect.any(Array) }),
+					expect.objectContaining({ id: "context.text", segments: expect.any(Array) }),
 				]),
 			}),
 		);
 	});
 
-	it("formats resolved v2 inspection for humans and JSON consumers", () => {
+	it("formats resolved inspection for humans and JSON consumers", () => {
 		const directory = temporaryFixture("valid/content-first");
 		const base = [
 			"inspect",
@@ -122,68 +141,26 @@ describe("CLI", () => {
 		);
 	});
 
-	it("returns and restores a durable migration operation through the CLI", () => {
-		const directory = temporaryFixture("valid/simple");
-		const written = execute(
-			["migrate", "authoring-v2", "--write", "--format", "json"],
-			directory,
-		);
-		expect(written).toMatchObject({ code: 0, stderr: "" });
-		const operationId = JSON.parse(written.stdout).operationId as string;
-		expect(operationId).toMatch(/^authoring-v2-[0-9a-f]{24}$/);
-
-		const listed = execute(
-			["migrate", "authoring-v2", "--list", "--format", "json"],
-			directory,
-		);
-		expect(listed).toMatchObject({ code: 0, stderr: "" });
-		expect(JSON.parse(listed.stdout).operations).toEqual([
-			expect.objectContaining({ operationId, state: "committed" }),
-		]);
-
-		const restored = execute(
-			["migrate", "authoring-v2", "--restore", operationId, "--format", "json"],
-			directory,
-		);
-		expect(restored).toMatchObject({ code: 0, stderr: "" });
-		expect(JSON.parse(restored.stdout)).toEqual(
-			expect.objectContaining({ restored: true, operationId }),
-		);
-
-		const purged = execute(
-			["migrate", "authoring-v2", "--purge", operationId, "--format", "json"],
-			directory,
-		);
-		expect(purged).toMatchObject({ code: 0, stderr: "" });
-		expect(JSON.parse(purged.stdout)).toEqual(
-			expect.objectContaining({
-				purged: true,
-				operation: expect.objectContaining({ operationId, state: "rolled-back" }),
-			}),
-		);
-	});
-
 	it("uses documented misuse and internal exit codes", () => {
-		const directory = temporaryFixture("valid/simple");
+		const directory = temporaryFixture("valid/content-first");
 		expect(execute(["unknown"], directory).code).toBe(2);
 		expect(execute(["inspect"], directory).code).toBe(2);
-		expect(execute(["lint", "--release-profile", "development"], directory).code).toBe(2);
 		expect(
 			execute(
 				[
-					"migrate",
-					"authoring-v2",
-					"--write",
-					"--restore",
-					"authoring-v2-000000000000000000000000",
+					"inspect",
+					"structuredGeneration.repair",
+					"--fallback-locale",
+					"en-US",
+					"--release-profile",
+					"development",
 				],
 				directory,
 			).code,
 		).toBe(2);
-
-		const v2 = temporaryFixture("valid/content-first");
-		const missingProfile = execute(["lint"], v2);
+		expect(execute(["lint", "--release-profile", "development"], directory).code).toBe(0);
+		const missingProfile = execute(["lint"], directory);
 		expect(missingProfile.code).toBe(2);
-		expect(missingProfile.stderr).toContain("config v2 requires --release-profile");
+		expect(missingProfile.stderr).toContain("--release-profile is required");
 	});
 });

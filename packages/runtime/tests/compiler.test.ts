@@ -5,10 +5,9 @@ import { S11tError } from "../src/diagnostics.js";
 
 function definition(): CanonicalContextDefinition {
 	return {
-		id: "example:greeting",
-		version: "1.0.0",
+		key: "example.greeting",
 		owner: "examples",
-		output: "text",
+		contentKind: "text",
 		sourceLocale: "ja-JP",
 		requiredLocales: ["ja-JP", "en-US"],
 		variables: {
@@ -48,14 +47,14 @@ describe("pure compiler", () => {
 
 	it("returns byte-identical artifacts for the same semantic input", () => {
 		const first = compileCatalog([definition()], {
-			defaultLocale: "ja-JP",
+			releaseProfile: "production",
 			provenance: {
 				configPath: "s11t.config.toml",
 				sourceFiles: ["contexts/greeting.context.toml"],
 			},
 		});
 		const second = compileCatalog([definition()], {
-			defaultLocale: "ja-JP",
+			releaseProfile: "production",
 			provenance: {
 				configPath: "s11t.config.toml",
 				sourceFiles: ["contexts/greeting.context.toml"],
@@ -66,11 +65,11 @@ describe("pure compiler", () => {
 
 	it("keeps provenance outside the catalog digest", () => {
 		const first = compileCatalog([definition()], {
-			defaultLocale: "ja-JP",
+			releaseProfile: "production",
 			provenance: { configPath: "a.toml", sourceFiles: ["contexts/a.context.toml"] },
 		});
 		const second = compileCatalog([definition()], {
-			defaultLocale: "ja-JP",
+			releaseProfile: "production",
 			provenance: { configPath: "b.toml", sourceFiles: ["contexts/b.context.toml"] },
 		});
 		expect(first.catalogDigest).toBe(second.catalogDigest);
@@ -79,14 +78,14 @@ describe("pure compiler", () => {
 	it("does not retain mutable variable definitions from compiler input", () => {
 		const input = definition();
 		const artifact = compileCatalog([input], {
-			defaultLocale: "ja-JP",
+			releaseProfile: "production",
 			provenance: {
 				configPath: "s11t.config.toml",
 				sourceFiles: ["contexts/greeting.context.toml"],
 			},
 		});
 		input.variables.name!.encoding = "json-string";
-		expect(artifact.contexts["example:greeting"]!.variables.name!.encoding).toBe("raw");
+		expect(artifact.contexts["example.greeting"]!.variables.name!.encoding).toBe("raw");
 	});
 
 	it("compiles available translations beyond the required locale set", () => {
@@ -95,20 +94,22 @@ describe("pure compiler", () => {
 		input.sourceLocale = "en-US";
 		input.sections[0]!.locales["fr-FR"] = "Bonjour, [[name]].";
 		const artifact = compileCatalog([input], {
-			defaultLocale: "en-US",
+			releaseProfile: "production",
 			provenance: { configPath: "s11t.config.toml", sourceFiles: ["contexts/greeting.context.toml"] },
 		});
-		expect(Object.keys(artifact.contexts["example:greeting"]!.locales)).toEqual([
+		expect(Object.keys(artifact.contexts["example.greeting"]!.locales)).toEqual([
 			"en-US",
 			"fr-FR",
 			"ja-JP",
 		]);
 	});
 
-	it("never emits an artifact that omits the catalog default locale", () => {
+	it("never emits an artifact that omits a required locale", () => {
+		const input = definition();
+		delete input.sections[0]!.locales["en-US"];
 		expect(() =>
-			compileCatalog([definition()], {
-				defaultLocale: "fr-FR",
+			compileCatalog([input], {
+				releaseProfile: "production",
 				provenance: {
 					configPath: "s11t.config.toml",
 					sourceFiles: ["contexts/greeting.context.toml"],
@@ -122,7 +123,7 @@ describe("pure compiler", () => {
 		input.sections[0]!.locales["en-US"] = "Hello, [[missing]].";
 		expect(() =>
 			compileCatalog([input], {
-				defaultLocale: "en-US",
+				releaseProfile: "production",
 				provenance: {
 					configPath: "s11t.config.toml",
 					sourceFiles: ["contexts/greeting.context.toml"],
