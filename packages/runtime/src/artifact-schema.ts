@@ -1,5 +1,9 @@
 import { S11tError } from "./diagnostics.js";
-import type { S11tCatalogArtifactV1, S11tCatalogArtifactV2 } from "./types.js";
+import type {
+	S11tCatalogArtifactV1,
+	S11tCatalogArtifactV2,
+	S11tCatalogArtifactV3,
+} from "./types.js";
 
 type Path = Array<string | number>;
 type UnknownRecord = Record<string, unknown>;
@@ -119,7 +123,11 @@ function nonEmptyUniqueStringArray(value: unknown, path: Path): string[] {
 	return result;
 }
 
-function validateVariable(value: unknown, path: Path): void {
+function validateVariable(
+	value: unknown,
+	path: Path,
+	requireDelimitedUntrusted = false,
+): void {
 	const object = record(value, path);
 	exactKeys(object, ["required", "type", "trust", "placement", "encoding"], path);
 	literal(object.required, true, [...path, "required"]);
@@ -129,6 +137,13 @@ function validateVariable(value: unknown, path: Path): void {
 	oneOf(object.encoding, ["raw", "json-string", "json-value"], [...path, "encoding"]);
 	if (object.trust === "untrusted" && object.encoding === "raw") {
 		fail([...path, "encoding"], "a non-raw encoding for untrusted data");
+	}
+	if (
+		requireDelimitedUntrusted &&
+		object.trust === "untrusted" &&
+		object.placement !== "delimited-context"
+	) {
+		fail([...path, "placement"], "delimited-context placement for untrusted data");
 	}
 	if (object.encoding === "raw" && object.type !== "string") {
 		fail([...path, "encoding"], "raw encoding with a string variable");
@@ -268,7 +283,11 @@ export function isCatalogArtifactV1(value: unknown): value is S11tCatalogArtifac
 const DOT_KEY_PATTERN = /^[A-Za-z][A-Za-z0-9_-]*(?:\.[A-Za-z][A-Za-z0-9_-]*)*$/;
 const ALIAS_KEY_PATTERN = /^(?:[A-Za-z][A-Za-z0-9_-]*(?:\.[A-Za-z][A-Za-z0-9_-]*)*|[A-Za-z][A-Za-z0-9_-]*:[A-Za-z][A-Za-z0-9_.-]*)$/;
 
-function validateContextV2(value: unknown, path: Path): void {
+function validateContextV2(
+	value: unknown,
+	path: Path,
+	requireDelimitedUntrusted = false,
+): void {
 	const object = record(value, path);
 	exactKeys(
 		object,
@@ -305,7 +324,11 @@ function validateContextV2(value: unknown, path: Path): void {
 		if (!VARIABLE_NAME_PATTERN.test(name)) {
 			fail([...path, "variables", name], "a variable name");
 		}
-		validateVariable(variable, [...path, "variables", name]);
+		validateVariable(
+			variable,
+			[...path, "variables", name],
+			requireDelimitedUntrusted,
+		);
 	}
 	const locales = record(object.locales, [...path, "locales"]);
 	if (Object.keys(locales).length === 0) fail([...path, "locales"], "a non-empty object");
@@ -362,6 +385,65 @@ export function assertCatalogArtifactV2(value: unknown): asserts value is S11tCa
 export function isCatalogArtifactV2(value: unknown): value is S11tCatalogArtifactV2 {
 	try {
 		assertCatalogArtifactV2(value);
+		return true;
+	} catch (error) {
+		if (error instanceof S11tError) return false;
+		throw error;
+	}
+}
+
+export function assertCatalogArtifactV3(value: unknown): asserts value is S11tCatalogArtifactV3 {
+	const object = record(value, []);
+	exactKeys(
+		object,
+		[
+			"format",
+			"schemaVersion",
+			"compilerVersion",
+			"releaseProfile",
+			"policyDigest",
+			"renderingContract",
+			"createdFrom",
+			"contexts",
+			"aliases",
+			"catalogDigest",
+		],
+		[],
+	);
+	literal(object.format, "s11t.catalog", ["format"]);
+	literal(object.schemaVersion, 3, ["schemaVersion"]);
+	literal(object.renderingContract, "delimited-context-v1", ["renderingContract"]);
+	nonEmptyString(object.compilerVersion, ["compilerVersion"]);
+	nonEmptyString(object.releaseProfile, ["releaseProfile"]);
+	digest(object.policyDigest, ["policyDigest"]);
+	const createdFrom = record(object.createdFrom, ["createdFrom"]);
+	exactKeys(createdFrom, ["configPath", "sourceFiles"], ["createdFrom"]);
+	relativePosixPath(createdFrom.configPath, ["createdFrom", "configPath"]);
+	stringArray(createdFrom.sourceFiles, ["createdFrom", "sourceFiles"]).forEach(
+		(sourceFile, index) =>
+			relativePosixPath(sourceFile, ["createdFrom", "sourceFiles", index]),
+	);
+	const contexts = record(object.contexts, ["contexts"]);
+	for (const [key, context] of Object.entries(contexts)) {
+		if (!DOT_KEY_PATTERN.test(key)) fail(["contexts", key], "a dot context key");
+		validateContextV2(context, ["contexts", key], true);
+	}
+	const aliases = record(object.aliases, ["aliases"]);
+	for (const [alias, target] of Object.entries(aliases)) {
+		if (!ALIAS_KEY_PATTERN.test(alias)) {
+			fail(["aliases", alias], "a dot or legacy context key");
+		}
+		const canonical = nonEmptyString(target, ["aliases", alias]);
+		if (!DOT_KEY_PATTERN.test(canonical)) {
+			fail(["aliases", alias], "a canonical dot context key target");
+		}
+	}
+	digest(object.catalogDigest, ["catalogDigest"]);
+}
+
+export function isCatalogArtifactV3(value: unknown): value is S11tCatalogArtifactV3 {
+	try {
+		assertCatalogArtifactV3(value);
 		return true;
 	} catch (error) {
 		if (error instanceof S11tError) return false;

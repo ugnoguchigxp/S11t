@@ -197,6 +197,18 @@ function parseVariables(
 		if (definition.trust === "untrusted" && definition.encoding === "raw") {
 			issue(file, "S11T_UNSAFE_UNTRUSTED_RAW", "Untrusted variables cannot use raw encoding", [...path, "encoding"]);
 		}
+		if (
+			config.artifactVersion === 3 &&
+			definition.trust === "untrusted" &&
+			definition.placement !== "delimited-context"
+		) {
+			issue(
+				file,
+				"S11T_UNSAFE_UNTRUSTED_PLACEMENT",
+				"Artifact v3 requires delimited-context placement for untrusted variables",
+				[...path, "placement"],
+			);
+		}
 		if (definition.encoding === "raw" && definition.type !== "string") {
 			issue(file, "S11T_ENCODING_TYPE_MISMATCH", "raw encoding only supports string variables", [...path, "encoding"]);
 		}
@@ -241,6 +253,7 @@ function validateCoverage(
 	sections: CanonicalSectionDefinitionV2[],
 	requiredLocales: string[],
 	file: string,
+	validateRequiredLocales = true,
 ): void {
 	const expected = Object.keys(sections[0]?.locales ?? {}).sort();
 	for (const [index, section] of sections.entries()) {
@@ -248,9 +261,11 @@ function validateCoverage(
 		if (JSON.stringify(available) !== JSON.stringify(expected)) {
 			issue(file, "S11T_TRANSLATION_MISSING", "Every section must define the same locale set", ["sections", index]);
 		}
-		for (const locale of requiredLocales) {
-			if (!Object.hasOwn(section.locales, locale)) {
-				issue(file, "S11T_TRANSLATION_MISSING", `Missing required locale: ${locale}`, ["sections", index, locale]);
+		if (validateRequiredLocales) {
+			for (const locale of requiredLocales) {
+				if (!Object.hasOwn(section.locales, locale)) {
+					issue(file, "S11T_TRANSLATION_MISSING", `Missing required locale: ${locale}`, ["sections", index, locale]);
+				}
 			}
 		}
 	}
@@ -328,6 +343,7 @@ export function parseAndResolveAuthoringV2(
 	sourcePath: string,
 	config: S11tProjectConfigV2,
 	releaseProfile: string,
+	options: { validateRequiredCoverage?: boolean } = {},
 ): ResolvedAuthoringDocumentV2 {
 	const source = object(input, file, []);
 	exactKeys(source, ["key", "content_kind", "text", "translations", "variables", "sections"], [], file, []);
@@ -349,7 +365,12 @@ export function parseAndResolveAuthoringV2(
 	const sections = hasText
 		? [simpleSection(source.text, source.translations, config, file)]
 		: parseSections(source.sections, config, file);
-	validateCoverage(sections, requiredLocales, file);
+	validateCoverage(
+		sections,
+		requiredLocales,
+		file,
+		options.validateRequiredCoverage !== false,
+	);
 	validateVariableReferences(sections, variables.definitions, file);
 	return {
 		file,
@@ -379,6 +400,7 @@ export function adaptAuthoringV1ToV2(
 	sourcePath: string,
 	config: S11tProjectConfigV2,
 	releaseProfile: string,
+	options: { validateRequiredCoverage?: boolean } = {},
 ): ResolvedAuthoringDocumentV2 {
 	const key = deriveKey(sourcePath, document.file);
 	const owner = resolveOwner(key, config, document.file);
@@ -390,7 +412,27 @@ export function adaptAuthoringV1ToV2(
 	}
 	const requiredLocales = resolveRequiredLocales(config, releaseProfile, document.file);
 	const sections = document.definition.sections.map((section) => ({ ...section, locales: { ...section.locales } }));
-	validateCoverage(sections, requiredLocales, document.file);
+	if (config.artifactVersion === 3) {
+		for (const [name, variable] of Object.entries(document.definition.variables)) {
+			if (
+				variable.trust === "untrusted" &&
+				variable.placement !== "delimited-context"
+			) {
+				issue(
+					document.file,
+					"S11T_UNSAFE_UNTRUSTED_PLACEMENT",
+					"Artifact v3 requires delimited-context placement for untrusted variables",
+					["variables", name, "placement"],
+				);
+			}
+		}
+	}
+	validateCoverage(
+		sections,
+		requiredLocales,
+		document.file,
+		options.validateRequiredCoverage !== false,
+	);
 	return {
 		file: document.file,
 		sourcePath,

@@ -27,12 +27,14 @@ export type {
 
 export { COMPILER_VERSION } from "./version.js";
 export { compileCatalogV2 } from "./compiler-v2.js";
+export { compileCatalogV3, RENDERING_CONTRACT_V3 } from "./compiler-v3.js";
 export type {
 	CanonicalContextDefinitionV2,
 	CanonicalSectionDefinitionV2,
 	CanonicalVariableDefinitionV2,
 	CompileCatalogV2Options,
 } from "./compiler-v2.js";
+export type { CompileCatalogV3Options } from "./compiler-v3.js";
 
 export type CompileCatalogOptions = {
 	defaultLocale: string;

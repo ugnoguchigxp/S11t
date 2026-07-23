@@ -1,6 +1,7 @@
 import {
 	compileCatalog,
 	compileCatalogV2,
+	compileCatalogV3,
 	type CanonicalContextDefinition,
 	type CanonicalContextDefinitionV2,
 } from "@s11t/runtime/compiler";
@@ -77,5 +78,19 @@ describe("generated type contract", () => {
 		expect(generated).toContain('"example:empty": Record<string, never>;');
 		expect(generated).not.toContain('"example.empty": {};');
 		expect(generated).not.toContain("JsonValue");
+
+		const generatedV3 = emitTypes(
+			compileCatalogV3([definition], {
+				releaseProfile: "development",
+				aliases: { "example:empty": "example.empty" },
+				provenance: {
+					configPath: "s11t.config.toml",
+					sourceFiles: ["contexts/empty.context.toml"],
+				},
+			}),
+		);
+		expect(generatedV3).toContain(
+			'import { createCatalogV3 } from "@s11t/runtime";',
+		);
 	});
 });

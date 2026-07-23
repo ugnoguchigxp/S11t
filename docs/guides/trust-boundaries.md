@@ -36,6 +36,13 @@ encoding = "json-value"
 S11t rejects `untrusted` plus `raw` in both authoring and runtime artifact validation. Do not relabel
 provider or user data as `trusted` merely to bypass this failure.
 
+Artifact v1 and v2 retain `placement` as metadata and do not generate delimiters. Select
+`artifact_version = 3` to enforce `delimited-context-v1`. Artifact v3 wraps delimited variables and escapes
+boundary characters in untrusted JSON/string values so runtime data cannot emit the closing tag.
+
+The delimiter preserves structure; it does not make the content trustworthy or replace authorization,
+schema validation, provider isolation, or tool policy.
+
 ## Keep provider input and audit identity together
 
 For a provider call, render with `bind()` and carry both outputs through the same application operation:

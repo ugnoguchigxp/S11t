@@ -10,12 +10,21 @@ npm install --save-dev @s11t/cli
 s11t lint [--config s11t.config.toml] [--release-profile name] [--format human|json]
 s11t build [--config s11t.config.toml] [--release-profile name] [--check] [--format human|json]
 s11t inspect key [--resolved] [--locale ja-JP] [--release-profile name] [--format human|json]
+s11t inspect --coverage --locale en-US [--fallback-locale ja-JP] --release-profile name [--format human|json]
 s11t migrate authoring-v2 [--write | --restore operation-id | --list | --purge operation-id] [--config s11t.config.toml] [--format human|json]
 ```
 
 Config v1 continues to build artifact v1 unchanged. Config v2 uses content-first source files, derives
 canonical dot keys from their paths, resolves locale/owner/variable policy at project level, and requires an
 explicit release profile for lint, build, and inspect.
+
+Config schema/authoring version 2 may select `artifact_version = 2` for byte-compatible metadata-only
+placement or `artifact_version = 3` for the `delimited-context-v1` runtime boundary.
+
+Coverage inspection reports canonical context keys as `direct`, ordered explicit `fallback`, or `missing`.
+It never adds the source locale implicitly and does not change `build --check` or release-profile policy.
+Missing target or required-profile coverage is returned in the JSON report; invalid source/configuration
+still fails normally.
 
 Migration is a dry-run by default. `--write` creates checksummed backups and returns an operation ID;
 `--restore` uses that ID and refuses to overwrite files changed after migration. Migration and restore

@@ -1,4 +1,7 @@
-import { assertCatalogArtifactV2 } from "./artifact-schema.js";
+import {
+	assertCatalogArtifactV2,
+	assertCatalogArtifactV3,
+} from "./artifact-schema.js";
 import {
 	cloneJson,
 	compareCodeUnits,
@@ -22,10 +25,18 @@ import {
 	hashPolicyV2,
 	hashReleaseV2,
 } from "./hash-v2.js";
+import {
+	hashArtifactV3,
+	hashCatalogV3,
+	hashDefinitionV3,
+	hashPolicyV3,
+	hashReleaseV3,
+} from "./hash-v3.js";
 import { hashRendered } from "./hash.js";
 import type {
 	JsonValue,
 	S11tCatalogArtifactV2,
+	S11tCatalogArtifactV3,
 	S11tCompiledContextV2,
 } from "./types.js";
 
@@ -108,6 +119,8 @@ export type SystemContextInvocationV2<K extends string = string> = {
 		readonly compilerVersion: string;
 		readonly releaseProfile: string;
 		readonly policyDigest: string;
+		readonly artifactSchemaVersion: 2 | 3;
+		readonly renderingContract: "metadata-only" | "delimited-context-v1";
 	};
 };
 
@@ -139,7 +152,9 @@ export type CatalogV2<C extends DefaultContract = DefaultContract> = {
 
 const LOCALE_PATTERN = /^[A-Za-z]{2,8}(?:-[A-Za-z0-9]{1,8})*$/;
 
-function definitionFromCompiled(context: S11tCompiledContextV2): CanonicalContextDefinitionV2 {
+export function definitionFromCompiledV2(
+	context: S11tCompiledContextV2,
+): CanonicalContextDefinitionV2 {
 	const availableLocales = Object.keys(context.locales).sort(compareCodeUnits);
 	const firstLocale = availableLocales[0];
 	if (firstLocale === undefined) {
@@ -202,7 +217,9 @@ function definitionFromCompiled(context: S11tCompiledContextV2): CanonicalContex
 	};
 }
 
-export function assertCatalogIntegrityV2(artifact: S11tCatalogArtifactV2): void {
+type ModernCatalogArtifact = S11tCatalogArtifactV2 | S11tCatalogArtifactV3;
+
+function assertCatalogIntegrityModern(artifact: ModernCatalogArtifact): void {
 	const releaseDigests: Record<string, string> = {};
 	const requiredLocales: Record<string, string[]> = {};
 	for (const [key, context] of Object.entries(artifact.contexts)) {
@@ -267,7 +284,15 @@ export function assertCatalogIntegrityV2(artifact: S11tCatalogArtifactV2): void 
 					}
 				}
 			}
-			const expected = hashArtifactV2({ key, locale, sections: compiledLocale.sections });
+			const expected =
+				artifact.schemaVersion === 3
+					? hashArtifactV3({
+							key,
+							locale,
+							sections: compiledLocale.sections,
+							renderingContract: artifact.renderingContract,
+						})
+					: hashArtifactV2({ key, locale, sections: compiledLocale.sections });
 			if (compiledLocale.artifactHash !== expected) {
 				digestMismatch(["contexts", key, "locales", locale, "artifactHash"], "Artifact");
 			}
@@ -283,16 +308,31 @@ export function assertCatalogIntegrityV2(artifact: S11tCatalogArtifactV2): void 
 				]);
 			}
 		}
-		const expectedDefinition = hashDefinitionV2(definitionFromCompiled(context));
+		const expectedDefinition =
+			artifact.schemaVersion === 3
+				? hashDefinitionV3(
+						definitionFromCompiledV2(context),
+						artifact.renderingContract,
+					)
+				: hashDefinitionV2(definitionFromCompiledV2(context));
 		if (context.definitionHash !== expectedDefinition) {
 			digestMismatch(["contexts", key, "definitionHash"], "Definition");
 		}
-		const expectedRelease = hashReleaseV2({
-			key,
-			compilerVersion: artifact.compilerVersion,
-			definitionHash: expectedDefinition,
-			artifactHashes,
-		});
+		const expectedRelease =
+			artifact.schemaVersion === 3
+				? hashReleaseV3({
+						key,
+						compilerVersion: artifact.compilerVersion,
+						definitionHash: expectedDefinition,
+						artifactHashes,
+						renderingContract: artifact.renderingContract,
+					})
+				: hashReleaseV2({
+						key,
+						compilerVersion: artifact.compilerVersion,
+						definitionHash: expectedDefinition,
+						artifactHashes,
+					});
 		if (context.releaseDigest !== expectedRelease) {
 			digestMismatch(["contexts", key, "releaseDigest"], "Release");
 		}
@@ -309,15 +349,39 @@ export function assertCatalogIntegrityV2(artifact: S11tCatalogArtifactV2): void 
 			throw new S11tError("S11T_ARTIFACT_INVALID", "Invalid context alias", ["aliases", alias]);
 		}
 	}
-	const expectedPolicy = hashPolicyV2({ releaseProfile: artifact.releaseProfile, requiredLocales });
+	const expectedPolicy =
+		artifact.schemaVersion === 3
+			? hashPolicyV3({
+					releaseProfile: artifact.releaseProfile,
+					requiredLocales,
+					renderingContract: artifact.renderingContract,
+				})
+			: hashPolicyV2({ releaseProfile: artifact.releaseProfile, requiredLocales });
 	if (artifact.policyDigest !== expectedPolicy) digestMismatch(["policyDigest"], "Policy");
-	const expectedCatalog = hashCatalogV2({
-		compilerVersion: artifact.compilerVersion,
-		policyDigest: expectedPolicy,
-		releaseDigests,
-		aliases: artifact.aliases,
-	});
+	const expectedCatalog =
+		artifact.schemaVersion === 3
+			? hashCatalogV3({
+					compilerVersion: artifact.compilerVersion,
+					policyDigest: expectedPolicy,
+					releaseDigests,
+					aliases: artifact.aliases,
+					renderingContract: artifact.renderingContract,
+				})
+			: hashCatalogV2({
+					compilerVersion: artifact.compilerVersion,
+					policyDigest: expectedPolicy,
+					releaseDigests,
+					aliases: artifact.aliases,
+				});
 	if (artifact.catalogDigest !== expectedCatalog) digestMismatch(["catalogDigest"], "Catalog");
+}
+
+export function assertCatalogIntegrityV2(artifact: S11tCatalogArtifactV2): void {
+	assertCatalogIntegrityModern(artifact);
+}
+
+export function assertCatalogIntegrityV3(artifact: S11tCatalogArtifactV3): void {
+	assertCatalogIntegrityModern(artifact);
 }
 
 function validateBinding(binding: CatalogBindingV2): CatalogBindingV2 {
@@ -337,8 +401,12 @@ function validateBinding(binding: CatalogBindingV2): CatalogBindingV2 {
 	return { instructionLocale: binding.instructionLocale, fallbackLocales };
 }
 
+function delimitEncodedValue(name: string, value: string): string {
+	return `<S11T_DELIMITED_CONTEXT variable="${name}">\n${value}\n</S11T_DELIMITED_CONTEXT>`;
+}
+
 function invoke(
-	artifact: S11tCatalogArtifactV2,
+	artifact: ModernCatalogArtifact,
 	requestedKey: string,
 	valuesInput: unknown,
 	binding: CatalogBindingV2,
@@ -373,7 +441,15 @@ function invoke(
 	}
 	const encodedValues: Record<string, string> = {};
 	for (const [name, definition] of Object.entries(context.variables)) {
-		encodedValues[name] = encodeValue(values[name], definition, [name]);
+		const encoded = encodeValue(values[name], definition, [name], {
+			escapeBoundaryCharacters:
+				artifact.schemaVersion === 3 && definition.trust === "untrusted",
+		});
+		encodedValues[name] =
+			artifact.schemaVersion === 3 &&
+			definition.placement === "delimited-context"
+				? delimitEncodedValue(name, encoded)
+				: encoded;
 	}
 	const locale = context.locales[resolvedLocale]!;
 	const text = `${locale.sections.map((section) => renderSection(section, encodedValues)).join("\n")}\n`;
@@ -398,12 +474,17 @@ function invoke(
 			compilerVersion: artifact.compilerVersion,
 			releaseProfile: artifact.releaseProfile,
 			policyDigest: artifact.policyDigest,
+			artifactSchemaVersion: artifact.schemaVersion,
+			renderingContract:
+				artifact.schemaVersion === 3
+					? artifact.renderingContract
+					: "metadata-only",
 		},
 	});
 }
 
 function bindInvocation<C extends DefaultContract>(
-	artifact: S11tCatalogArtifactV2,
+	artifact: ModernCatalogArtifact,
 	binding: CatalogBindingV2,
 ): ReturnType<CatalogV2<C>["bind"]> {
 	const snapshot = validateBinding(binding);
@@ -422,12 +503,11 @@ function textRenderer<C extends DefaultContract>(
 		invokeBound(key, values).content.text) as TextRenderer<C>);
 }
 
-export function createCatalogV2<C extends DefaultContract = DefaultContract>(
-	input: unknown,
+function createCatalogModern<C extends DefaultContract = DefaultContract>(
+	input: ModernCatalogArtifact,
 	options: { expectedCatalogDigest?: string } = {},
 ): CatalogV2<C> {
-	assertCatalogArtifactV2(input);
-	assertCatalogIntegrityV2(input);
+	assertCatalogIntegrityModern(input);
 	if (
 		options.expectedCatalogDigest !== undefined &&
 		input.catalogDigest !== options.expectedCatalogDigest
@@ -436,7 +516,7 @@ export function createCatalogV2<C extends DefaultContract = DefaultContract>(
 	}
 	const artifact = deepFreeze(
 		cloneJson(input as unknown as JsonValue),
-	) as unknown as S11tCatalogArtifactV2;
+	) as unknown as ModernCatalogArtifact;
 	const descriptions = deepFreeze(
 		Object.values(artifact.contexts)
 			.sort((left, right) => compareCodeUnits(left.key, right.key))
@@ -588,4 +668,20 @@ export function createCatalogV2<C extends DefaultContract = DefaultContract>(
 				).content.text;
 			}) as TextRenderer<C>),
 	};
+}
+
+export function createCatalogV2<C extends DefaultContract = DefaultContract>(
+	input: unknown,
+	options: { expectedCatalogDigest?: string } = {},
+): CatalogV2<C> {
+	assertCatalogArtifactV2(input);
+	return createCatalogModern<C>(input, options);
+}
+
+export function createCatalogV3<C extends DefaultContract = DefaultContract>(
+	input: unknown,
+	options: { expectedCatalogDigest?: string } = {},
+): CatalogV2<C> {
+	assertCatalogArtifactV3(input);
+	return createCatalogModern<C>(input, options);
 }

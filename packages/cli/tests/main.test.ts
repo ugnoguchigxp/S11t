@@ -96,6 +96,32 @@ describe("CLI", () => {
 		);
 	});
 
+	it("emits machine-readable catalog locale coverage", () => {
+		const directory = temporaryFixture("valid/locale-rollout");
+		const result = execute(
+			[
+				"inspect",
+				"--coverage",
+				"--locale",
+				"en-US",
+				"--fallback-locale",
+				"fr-FR",
+				"--release-profile",
+				"development",
+				"--format",
+				"json",
+			],
+			directory,
+		);
+		expect(result).toMatchObject({ code: 0, stderr: "" });
+		expect(JSON.parse(result.stdout)).toEqual(
+			expect.objectContaining({
+				requiredCoverageSatisfied: true,
+				totals: { contexts: 3, direct: 1, fallback: 1, missing: 1 },
+			}),
+		);
+	});
+
 	it("returns and restores a durable migration operation through the CLI", () => {
 		const directory = temporaryFixture("valid/simple");
 		const written = execute(

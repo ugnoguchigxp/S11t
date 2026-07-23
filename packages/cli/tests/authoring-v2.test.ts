@@ -9,10 +9,13 @@ import {
 } from "../src/authoring-v2.js";
 import { compileProject, isCompiledProjectV2 } from "../src/compile-source.js";
 import { parseProjectConfigV2 } from "../src/config-v2.js";
-import { inspectContext } from "../src/inspect-command.js";
+import { inspectContext, inspectCoverage } from "../src/inspect-command.js";
 
 const fixtureRoot = fileURLToPath(
 	new URL("../../../fixtures/valid/content-first/", import.meta.url),
+);
+const coverageFixtureRoot = fileURLToPath(
+	new URL("../../../fixtures/valid/locale-rollout/", import.meta.url),
 );
 
 function testConfig() {
@@ -59,6 +62,32 @@ describe("content-first authoring v2", () => {
 					encoding: "raw",
 				},
 			},
+		});
+	});
+
+	it("compiles artifact v3 only when explicitly selected", () => {
+		const config = testConfig();
+		config.artifactVersion = 3;
+		const document = parseAndResolveAuthoringV2(
+			{
+				text: "[[value]]",
+				variables: {
+					value: {
+						type: "string",
+						trust: "untrusted",
+						placement: "delimited-context",
+						encoding: "json-string",
+					},
+				},
+			},
+			"contexts/example/greeting.context.toml",
+			"example/greeting.context.toml",
+			config,
+			"development",
+		);
+		expect(document.definition.variables.value).toMatchObject({
+			trust: "untrusted",
+			placement: "delimited-context",
 		});
 	});
 
@@ -124,6 +153,63 @@ describe("content-first authoring v2", () => {
 		expectDiagnostic(
 			() => inspectContext("structuredOutput:repair", { cwd: v1Root, locale: "fr-FR" }),
 			"S11T_LOCALE_NOT_FOUND",
+		);
+	});
+
+	it("reports direct, ordered fallback, missing, and required-profile coverage", () => {
+		expect(
+			inspectCoverage({
+				cwd: coverageFixtureRoot,
+				releaseProfile: "development",
+				locale: "en-US",
+				fallbackLocales: ["fr-FR"],
+			}),
+		).toEqual({
+			schemaVersion: 1,
+			releaseProfile: "development",
+			sourceLocale: "ja-JP",
+			requestedLocale: "en-US",
+			fallbackLocales: ["fr-FR"],
+			requiredLocales: ["ja-JP"],
+			requiredCoverageSatisfied: true,
+			totals: { contexts: 3, direct: 1, fallback: 1, missing: 1 },
+			direct: { keys: ["rollout.direct"] },
+			fallback: {
+				keys: ["rollout.fallback"],
+				resolvedByLocale: { "fr-FR": ["rollout.fallback"] },
+			},
+			missing: { keys: ["rollout.missing"] },
+		});
+
+		expect(
+			inspectCoverage({
+				cwd: coverageFixtureRoot,
+				releaseProfile: "production",
+				locale: "en-US",
+				fallbackLocales: ["ja-JP"],
+			}).requiredCoverageSatisfied,
+		).toBe(false);
+	});
+
+	it("validates coverage locale bindings like the runtime", () => {
+		expectDiagnostic(
+			() =>
+				inspectCoverage({
+					cwd: coverageFixtureRoot,
+					releaseProfile: "development",
+					locale: "invalid locale",
+				}),
+			"S11T_LOCALE_INVALID",
+		);
+		expectDiagnostic(
+			() =>
+				inspectCoverage({
+					cwd: coverageFixtureRoot,
+					releaseProfile: "development",
+					locale: "en-US",
+					fallbackLocales: ["ja-JP", "ja-JP"],
+				}),
+			"S11T_LOCALE_INVALID",
 		);
 	});
 

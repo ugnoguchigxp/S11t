@@ -104,11 +104,22 @@ try {
 		result.invocationV2?.manifest?.requestedLocale !== "ja-JP" ||
 		result.invocationV2?.manifest?.resolvedLocale !== "ja-JP" ||
 		result.invocationV2?.manifest?.fallbackLocales?.length !== 0 ||
+		result.invocationV2?.manifest?.artifactSchemaVersion !== 3 ||
+		result.invocationV2?.manifest?.renderingContract !== "delimited-context-v1" ||
 		result.invocationV2?.manifest?.renderedHash === undefined ||
 		result.invocationV2?.manifest?.releaseDigest === undefined ||
 		result.invocationV2?.manifest?.policyDigest === undefined
 	) {
 		throw new Error("Consumer did not retain the artifact v2 invocation manifest");
+	}
+	if (
+		result.renderedHashVerifiedV3 !== true ||
+		result.requestAuditV3?.finalManifest?.renderedHash !==
+			result.invocationV2?.manifest?.renderedHash ||
+		result.requestAuditV3?.renderTrace?.length !== 1 ||
+		result.requestAuditV3?.renderTrace?.[0]?.via !== "invoke"
+	) {
+		throw new Error("Consumer did not retain the artifact v3 request audit");
 	}
 	const expectedVersion = manifest.packages[0]?.version;
 	if (invocation.manifest?.compilerVersion !== expectedVersion) {

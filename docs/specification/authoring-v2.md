@@ -35,6 +35,10 @@ encoding = "raw"
 relabel it. Runtime language selection is not stored in this config or in an artifact default; the host
 binds it once at its top-level request/run boundary.
 
+`artifact_version` may be `2` or `3`. Version 2 preserves metadata-only placement and existing rendered
+text. Version 3 opts into `delimited-context-v1` and rejects every `untrusted` variable whose placement is
+not `delimited-context`.
+
 The root `text` (or each section's `text`) is the source-locale authority. A `translations` table whose
 key equals `authoring.source_locale` is rejected instead of silently overriding that text.
 

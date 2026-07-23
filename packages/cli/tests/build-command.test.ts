@@ -14,6 +14,7 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import { buildProject } from "../src/build-command.js";
 import { S11tDiagnosticError } from "../src/diagnostics.js";
+import { inspectContext } from "../src/inspect-command.js";
 
 const temporaryDirectories: string[] = [];
 
@@ -56,6 +57,46 @@ describe("build command", () => {
 			}),
 		);
 		expect(readFileSync(result.catalogPath, "utf8")).toBe(before);
+	});
+
+	it("builds artifact v3 only when explicitly configured", () => {
+		const directory = temporaryFixture("valid/content-first");
+		const configPath = join(directory, "s11t.config.toml");
+		writeFileSync(
+			configPath,
+			readFileSync(configPath, "utf8").replace(
+				"artifact_version = 2",
+				"artifact_version = 3",
+			),
+		);
+		const result = buildProject({
+			cwd: directory,
+			releaseProfile: "production",
+		});
+		const artifact = JSON.parse(readFileSync(result.catalogPath, "utf8")) as {
+			schemaVersion: number;
+			renderingContract: string;
+		};
+		expect(artifact).toMatchObject({
+			schemaVersion: 3,
+			renderingContract: "delimited-context-v1",
+		});
+		expect(readFileSync(result.typesPath, "utf8")).toContain(
+			'import { createCatalogV3 } from "@s11t/runtime";',
+		);
+		expect(() => createCatalog(artifact)).not.toThrow();
+		expect(
+			inspectContext("structuredGeneration.repair", {
+				cwd: directory,
+				releaseProfile: "production",
+				locale: "en-US",
+			}),
+		).toEqual(
+			expect.objectContaining({
+				key: "structuredGeneration.repair",
+				locale: "en-US",
+			}),
+		);
 	});
 
 	it("preserves previous successful outputs when validation fails", () => {

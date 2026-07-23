@@ -1,6 +1,6 @@
 schema_version = 2
 authoring_version = 2
-artifact_version = 2
+artifact_version = 3
 source_dir = "contexts-v2"
 out_dir = ".s11t-v2"
 

@@ -9,7 +9,7 @@ export type S11tReleaseProfileV2 = {
 export type S11tProjectConfigV2 = {
 	schemaVersion: 2;
 	authoringVersion: 2;
-	artifactVersion: 2;
+	artifactVersion: 2 | 3;
 	sourceDir: string;
 	outDir: string;
 	authoring: { sourceLocale: string };
@@ -115,6 +115,7 @@ function localeArray(value: unknown, file: string, path: Path): string[] {
 function parseVariableProfiles(
 	input: unknown,
 	file: string,
+	requireDelimitedUntrusted = false,
 ): Record<string, CanonicalVariableDefinitionV2> {
 	if (input === undefined) return {};
 	const source = object(input, file, ["variable_profiles"]);
@@ -133,6 +134,17 @@ function parseVariableProfiles(
 		if (!["inline", "delimited-context"].includes(placement)) issue(file, "Invalid variable placement", [...path, "placement"]);
 		if (!["raw", "json-string", "json-value"].includes(encoding)) issue(file, "Invalid variable encoding", [...path, "encoding"]);
 		if (trust === "untrusted" && encoding === "raw") issue(file, "Untrusted variables cannot use raw encoding", [...path, "encoding"]);
+		if (
+			requireDelimitedUntrusted &&
+			trust === "untrusted" &&
+			placement !== "delimited-context"
+		) {
+			issue(
+				file,
+				"Artifact v3 requires delimited-context placement for untrusted variables",
+				[...path, "placement"],
+			);
+		}
 		if (encoding === "raw" && type !== "string") issue(file, "raw encoding only supports string variables", [...path, "encoding"]);
 		if (encoding === "json-string" && type === "json") issue(file, "json-string does not support json variables", [...path, "encoding"]);
 		result[name] = {
@@ -180,8 +192,16 @@ export function parseProjectConfigV2(
 		file,
 		[],
 	);
-	if (source.schema_version !== 2 || source.authoring_version !== 2 || source.artifact_version !== 2) {
-		return issue(file, "schema_version, authoring_version and artifact_version must all be 2", []);
+	if (
+		source.schema_version !== 2 ||
+		source.authoring_version !== 2 ||
+		(source.artifact_version !== 2 && source.artifact_version !== 3)
+	) {
+		return issue(
+			file,
+			"schema_version and authoring_version must be 2; artifact_version must be 2 or 3",
+			[],
+		);
 	}
 	const authoring = object(source.authoring, file, ["authoring"]);
 	exactKeys(authoring, ["source_locale"], ["source_locale"], file, ["authoring"]);
@@ -222,14 +242,18 @@ export function parseProjectConfigV2(
 	return {
 		schemaVersion: 2,
 		authoringVersion: 2,
-		artifactVersion: 2,
+		artifactVersion: source.artifact_version,
 		sourceDir: relativeDirectory(source.source_dir, file, ["source_dir"]),
 		outDir: relativeDirectory(source.out_dir, file, ["out_dir"]),
 		authoring: { sourceLocale: locale(authoring.source_locale, file, ["authoring", "source_locale"]) },
 		governance: { requireOwner: governance.require_owner },
 		keyspaces,
 		releaseProfiles,
-		variableProfiles: parseVariableProfiles(source.variable_profiles, file),
+		variableProfiles: parseVariableProfiles(
+			source.variable_profiles,
+			file,
+			source.artifact_version === 3,
+		),
 		keyAliases,
 	};
 }

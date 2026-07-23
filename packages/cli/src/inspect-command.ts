@@ -1,5 +1,135 @@
 import { S11tDiagnosticError, type S11tDiagnostic } from "./diagnostics.js";
 import { compileProject, isCompiledProjectV2 } from "./compile-source.js";
+import { loadProject } from "./discover.js";
+
+const LOCALE_PATTERN = /^[A-Za-z]{2,8}(?:-[A-Za-z0-9]{1,8})*$/;
+
+export type CoverageStatus = "direct" | "fallback" | "missing";
+
+export type LocaleCoverageResult = {
+	schemaVersion: 1;
+	releaseProfile: string;
+	sourceLocale: string;
+	requestedLocale: string;
+	fallbackLocales: string[];
+	requiredLocales: string[];
+	requiredCoverageSatisfied: boolean;
+	totals: {
+		contexts: number;
+		direct: number;
+		fallback: number;
+		missing: number;
+	};
+	direct: { keys: string[] };
+	fallback: {
+		keys: string[];
+		resolvedByLocale: Record<string, string[]>;
+	};
+	missing: { keys: string[] };
+};
+
+function coverageDiagnostic(
+	code: string,
+	message: string,
+	file: string,
+	path: Array<string | number>,
+): never {
+	throw new S11tDiagnosticError([{ code, severity: "error", message, file, path }]);
+}
+
+function hasLocale(
+	sections: readonly { locales: Record<string, string> }[],
+	locale: string,
+): boolean {
+	return sections.every((section) => Object.hasOwn(section.locales, locale));
+}
+
+export function inspectCoverage(options: {
+	config?: string;
+	locale: string;
+	fallbackLocales?: readonly string[];
+	cwd?: string;
+	releaseProfile: string;
+}): LocaleCoverageResult {
+	const fallbackLocales = [...(options.fallbackLocales ?? [])];
+	if (!LOCALE_PATTERN.test(options.locale)) {
+		coverageDiagnostic(
+			"S11T_LOCALE_INVALID",
+			`Invalid requested locale: ${options.locale}`,
+			options.config ?? "s11t.config.toml",
+			["locale"],
+		);
+	}
+	if (
+		fallbackLocales.some((locale) => !LOCALE_PATTERN.test(locale)) ||
+		fallbackLocales.includes(options.locale) ||
+		new Set(fallbackLocales).size !== fallbackLocales.length
+	) {
+		coverageDiagnostic(
+			"S11T_LOCALE_INVALID",
+			"Fallback locales must be unique valid locales and differ from the requested locale",
+			options.config ?? "s11t.config.toml",
+			["fallbackLocales"],
+		);
+	}
+	const project = loadProject(
+		options.config,
+		options.cwd,
+		options.releaseProfile,
+		{ validateRequiredCoverage: false },
+	);
+	if (!("releaseProfile" in project)) {
+		coverageDiagnostic(
+			"S11T_RELEASE_PROFILE_UNSUPPORTED",
+			"Locale coverage inspection requires config v2",
+			project.configPath,
+			[],
+		);
+	}
+	const direct: string[] = [];
+	const fallback: string[] = [];
+	const missing: string[] = [];
+	const resolvedByLocale = Object.fromEntries(
+		fallbackLocales.map((locale) => [locale, [] as string[]]),
+	);
+	let requiredCoverageSatisfied = true;
+	for (const document of project.documents) {
+		const { key, requiredLocales, sections } = document.definition;
+		if (requiredLocales.some((locale) => !hasLocale(sections, locale))) {
+			requiredCoverageSatisfied = false;
+		}
+		if (hasLocale(sections, options.locale)) {
+			direct.push(key);
+			continue;
+		}
+		const resolvedFallback = fallbackLocales.find((locale) => hasLocale(sections, locale));
+		if (resolvedFallback === undefined) {
+			missing.push(key);
+			continue;
+		}
+		fallback.push(key);
+		resolvedByLocale[resolvedFallback]!.push(key);
+	}
+	const requiredLocales = [...(project.documents[0]?.definition.requiredLocales ?? [])];
+	return {
+		schemaVersion: 1,
+		releaseProfile: project.releaseProfile,
+		sourceLocale: project.config.authoring.sourceLocale,
+		requestedLocale: options.locale,
+		fallbackLocales,
+		requiredLocales,
+		requiredCoverageSatisfied,
+		totals: {
+			contexts: project.documents.length,
+			direct: direct.length,
+			fallback: fallback.length,
+			missing: missing.length,
+		},
+		direct: { keys: direct },
+		fallback: { keys: fallback, resolvedByLocale },
+		missing: { keys: missing },
+	};
+}
 
 export function inspectContext(
 	key: string,

@@ -78,7 +78,11 @@ export function assertJsonValue(value: unknown, path: Array<string | number> = [
 }
 
 function escapeJsonString(value: string): string {
-	return JSON.stringify(value).replace(/[<>&\u2028\u2029]/g, (character) => {
+	return escapeBoundaryCharacters(JSON.stringify(value));
+}
+
+function escapeBoundaryCharacters(value: string): string {
+	return value.replace(/[<>&\u2028\u2029]/g, (character) => {
 		const code = character.codePointAt(0);
 		return `\\u${code?.toString(16).padStart(4, "0")}`;
 	});
@@ -88,6 +92,7 @@ export function encodeValue(
 	value: unknown,
 	definition: S11tCompiledVariableV1,
 	path: Array<string | number>,
+	options: { escapeBoundaryCharacters?: boolean } = {},
 ): string {
 	let jsonValue: JsonValue | undefined;
 	if (definition.type === "string" && typeof value !== "string") {
@@ -109,5 +114,8 @@ export function encodeValue(
 	if (definition.encoding === "raw") return value as string;
 	if (definition.encoding === "json-string") return escapeJsonString(String(value));
 	jsonValue ??= snapshotJsonValueInternal(value, path, new Set<object>());
-	return canonicalJson(jsonValue);
+	const encoded = canonicalJson(jsonValue);
+	return options.escapeBoundaryCharacters === true
+		? escapeBoundaryCharacters(encoded)
+		: encoded;
 }

@@ -56,6 +56,10 @@ encoding = "json-string"
 `authoring.source_locale` is the only authoring-language declaration. Runtime language is deliberately
 absent from the config and artifact: the host supplies it from one top-level setting.
 
+Use `artifact_version = 3` when untrusted values must receive an enforced
+`delimited-context-v1` structural boundary. Version 2 preserves the original rendered text and treats
+placement as metadata.
+
 Create `contexts/codingAgent/task.context.toml`:
 
 ```toml
@@ -144,6 +148,30 @@ const render = catalog.createTextRenderer(() => ({
 
 Do not use the live renderer for a multi-context request snapshot. The text-only adapters also omit the
 invocation manifest, so provider submission and audited paths should use `bind()`.
+
+For compound audited prompts, use one request snapshot:
+
+```ts
+const requestCatalog = catalog.bindRequest({
+  instructionLocale: request.settings.instructionLocale,
+  fallbackLocales: request.settings.instructionFallbackLocales,
+});
+const role = requestCatalog.p("codingAgent.role", {});
+const final = requestCatalog.invoke("codingAgent.task", {
+  taskGoal: `${role}\n${request.userMessage}`,
+});
+const audit = requestCatalog.finalize(final);
+```
+
+The audit preserves successful render calls, including duplicates, in call order. Verify the text passed
+to the provider with `verifyRenderedHash(sentText, audit.finalManifest.renderedHash)`.
+
+Inspect staged locale rollout without making the target locale required:
+
+```sh
+s11t inspect --coverage --locale en-US --fallback-locale ja-JP \
+  --release-profile development --format json
+```
 
 S11t does not call an LLM provider and does not own authorization, retries, tool enforcement, or trace
 persistence. See [backend integration](./backend-integration.md), [trust boundaries](./trust-boundaries.md),

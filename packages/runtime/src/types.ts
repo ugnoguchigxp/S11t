@@ -103,3 +103,25 @@ export type S11tCatalogArtifactV2 = {
 	aliases: Record<string, string>;
 	catalogDigest: string;
 };
+
+export type S11tRenderingContractV3 = "delimited-context-v1";
+export type S11tCompiledContextV3 = S11tCompiledContextV2;
+export type S11tCompiledLocaleV3 = S11tCompiledLocaleV2;
+export type S11tCompiledSectionV3 = S11tCompiledSectionV2;
+export type S11tCompiledVariableV3 = S11tCompiledVariableV2;
+
+export type S11tCatalogArtifactV3 = {
+	format: "s11t.catalog";
+	schemaVersion: 3;
+	compilerVersion: string;
+	releaseProfile: string;
+	policyDigest: string;
+	renderingContract: S11tRenderingContractV3;
+	createdFrom: {
+		configPath: string;
+		sourceFiles: string[];
+	};
+	contexts: Record<string, S11tCompiledContextV3>;
+	aliases: Record<string, string>;
+	catalogDigest: string;
+};

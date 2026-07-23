@@ -2,7 +2,11 @@ import { randomBytes } from "node:crypto";
 import { mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { basename, resolve } from "node:path";
 
-import { assertCatalogArtifactV1, assertCatalogArtifactV2 } from "@s11t/runtime";
+import {
+	assertCatalogArtifactV1,
+	assertCatalogArtifactV2,
+	assertCatalogArtifactV3,
+} from "@s11t/runtime";
 
 import { compileProject } from "./compile-source.js";
 import { S11tDiagnosticError, type S11tDiagnostic } from "./diagnostics.js";
@@ -52,7 +56,8 @@ export function buildProject(
 	const catalogBytes = `${JSON.stringify(project.artifact, null, 2)}\n`;
 	const parsedArtifact: unknown = JSON.parse(catalogBytes);
 	if (project.artifact.schemaVersion === 1) assertCatalogArtifactV1(parsedArtifact);
-	else assertCatalogArtifactV2(parsedArtifact);
+	else if (project.artifact.schemaVersion === 2) assertCatalogArtifactV2(parsedArtifact);
+	else assertCatalogArtifactV3(parsedArtifact);
 	const typeBytes = emitTypes(project.artifact);
 	const outputDirectory = resolve(project.configDirectory, project.config.outDir);
 	const catalogPath = resolve(outputDirectory, "catalog.json");

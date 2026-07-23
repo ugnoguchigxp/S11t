@@ -1,5 +1,9 @@
-import { assertCatalogArtifactV1, isCatalogArtifactV2 } from "./artifact-schema.js";
-import { createCatalogV2 } from "./catalog-v2.js";
+import {
+	assertCatalogArtifactV1,
+	isCatalogArtifactV2,
+	isCatalogArtifactV3,
+} from "./artifact-schema.js";
+import { createCatalogV2, createCatalogV3 } from "./catalog-v2.js";
 import {
 	cloneJson,
 	compareCodeUnits,
@@ -354,6 +358,9 @@ export function createCatalog<C extends DefaultContract = DefaultContract>(
 ): Catalog<C> {
 	if (isCatalogArtifactV2(input)) {
 		return createCatalogV2<C>(input, options) as unknown as Catalog<C>;
+	}
+	if (isCatalogArtifactV3(input)) {
+		return createCatalogV3<C>(input, options) as unknown as Catalog<C>;
 	}
 	assertCatalogArtifactV1(input);
 	assertCatalogIntegrityV1(input);

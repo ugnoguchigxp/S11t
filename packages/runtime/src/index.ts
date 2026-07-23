@@ -1,11 +1,18 @@
 export {
 	assertCatalogArtifactV1,
 	assertCatalogArtifactV2,
+	assertCatalogArtifactV3,
 	isCatalogArtifactV1,
 	isCatalogArtifactV2,
+	isCatalogArtifactV3,
 } from "./artifact-schema.js";
 export { createCatalog } from "./catalog.js";
-export { assertCatalogIntegrityV2, createCatalogV2 } from "./catalog-v2.js";
+export {
+	assertCatalogIntegrityV2,
+	assertCatalogIntegrityV3,
+	createCatalogV2,
+	createCatalogV3,
+} from "./catalog-v2.js";
 export type {
 	BoundRequestCatalog,
 	BoundTextCatalog,
@@ -35,6 +42,7 @@ export type {
 	JsonValue,
 	S11tCatalogArtifactV1,
 	S11tCatalogArtifactV2,
+	S11tCatalogArtifactV3,
 	S11tCompiledContextV1,
 	S11tCompiledContextV2,
 	S11tCompiledLocaleV1,
@@ -43,5 +51,10 @@ export type {
 	S11tCompiledSectionV2,
 	S11tCompiledVariableV1,
 	S11tCompiledVariableV2,
+	S11tCompiledContextV3,
+	S11tCompiledLocaleV3,
+	S11tCompiledSectionV3,
+	S11tCompiledVariableV3,
+	S11tRenderingContractV3,
 	TemplateSegment,
 } from "./types.js";

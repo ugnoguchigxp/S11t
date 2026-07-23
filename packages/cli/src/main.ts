@@ -1,6 +1,6 @@
 import { buildProject } from "./build-command.js";
 import { S11tDiagnosticError, type S11tDiagnostic } from "./diagnostics.js";
-import { inspectContext } from "./inspect-command.js";
+import { inspectContext, inspectCoverage } from "./inspect-command.js";
 import { lintProject } from "./lint-command.js";
 import {
 	listAuthoringV2Migrations,
@@ -14,6 +14,7 @@ Usage:
   s11t lint [--config s11t.config.toml] [--release-profile name] [--format human|json]
   s11t build [--config s11t.config.toml] [--release-profile name] [--check] [--format human|json]
   s11t inspect <key> [--resolved] [--locale ja-JP] [--release-profile name] [--config s11t.config.toml] [--format human|json]
+  s11t inspect --coverage --locale en-US [--fallback-locale ja-JP] [--release-profile name] [--config s11t.config.toml] [--format human|json]
   s11t migrate authoring-v2 [--write | --restore operation-id | --list | --purge operation-id] [--config s11t.config.toml] [--format human|json]
   s11t --help
 `;
@@ -40,6 +41,15 @@ function takeFlag(arguments_: string[], name: string): boolean {
 	if (index === -1) return false;
 	arguments_.splice(index, 1);
 	return true;
+}
+
+function takeOptions(arguments_: string[], name: string): string[] {
+	const values: string[] = [];
+	for (;;) {
+		const value = takeOption(arguments_, name);
+		if (value === undefined) return values;
+		values.push(value);
+	}
 }
 
 function formatDiagnostic(diagnostic: S11tDiagnostic): string {
@@ -131,8 +141,34 @@ export function runCli(
 		}
 		if (command === "inspect") {
 			const locale = takeOption(arguments_, "--locale");
+			const fallbackLocales = takeOptions(arguments_, "--fallback-locale");
+			const coverage = takeFlag(arguments_, "--coverage");
 			const resolved = takeFlag(arguments_, "--resolved");
 			const key = arguments_.shift();
+			if (coverage) {
+				if (key !== undefined) {
+					throw new CliUsageError("inspect --coverage does not accept a context key");
+				}
+				if (resolved) throw new CliUsageError("inspect --coverage does not accept --resolved");
+				if (locale === undefined) throw new CliUsageError("inspect --coverage requires --locale");
+				if (releaseProfile === undefined) {
+					throw new CliUsageError("inspect --coverage requires --release-profile");
+				}
+				const result = inspectCoverage({
+					...(config === undefined ? {} : { config }),
+					locale,
+					fallbackLocales,
+					releaseProfile,
+					cwd: io.cwd,
+				});
+				io.stdout(
+					format === "json" ? `${JSON.stringify(result, null, 2)}\n` : formatInspectHuman(result),
+				);
+				return 0;
+			}
+			if (fallbackLocales.length > 0) {
+				throw new CliUsageError("--fallback-locale requires --coverage");
+			}
 			if (key === undefined) throw new CliUsageError("inspect requires a context key");
 			if (arguments_.length > 0) throw new CliUsageError(`Unknown argument: ${arguments_[0]}`);
 			const result = inspectContext(key, {

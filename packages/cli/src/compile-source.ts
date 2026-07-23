@@ -1,10 +1,20 @@
-import { compileCatalog, compileCatalogV2 } from "@s11t/runtime/compiler";
-import type { S11tCatalogArtifactV1, S11tCatalogArtifactV2 } from "@s11t/runtime";
+import {
+	compileCatalog,
+	compileCatalogV2,
+	compileCatalogV3,
+} from "@s11t/runtime/compiler";
+import type {
+	S11tCatalogArtifactV1,
+	S11tCatalogArtifactV2,
+	S11tCatalogArtifactV3,
+} from "@s11t/runtime";
 
 import { loadProject, type LoadedProjectV1, type LoadedProjectV2 } from "./discover.js";
 
 export type CompiledProjectV1 = LoadedProjectV1 & { artifact: S11tCatalogArtifactV1 };
-export type CompiledProjectV2 = LoadedProjectV2 & { artifact: S11tCatalogArtifactV2 };
+export type CompiledProjectV2 = LoadedProjectV2 & {
+	artifact: S11tCatalogArtifactV2 | S11tCatalogArtifactV3;
+};
 export type CompiledProject = CompiledProjectV1 | CompiledProjectV2;
 
 function isLoadedProjectV1(project: LoadedProjectV1 | LoadedProjectV2): project is LoadedProjectV1 {
@@ -12,7 +22,7 @@ function isLoadedProjectV1(project: LoadedProjectV1 | LoadedProjectV2): project 
 }
 
 export function isCompiledProjectV2(project: CompiledProject): project is CompiledProjectV2 {
-	return project.artifact.schemaVersion === 2;
+	return project.artifact.schemaVersion !== 1;
 }
 
 export function compileProject(
@@ -32,13 +42,15 @@ export function compileProject(
 		);
 		return { ...project, artifact };
 	}
-	const artifact = compileCatalogV2(
-		project.documents.map((document) => document.definition),
-		{
-			releaseProfile: project.releaseProfile,
-			aliases: project.aliases,
-			provenance,
-		},
-	);
+	const definitions = project.documents.map((document) => document.definition);
+	const options = {
+		releaseProfile: project.releaseProfile,
+		aliases: project.aliases,
+		provenance,
+	};
+	const artifact =
+		project.config.artifactVersion === 3
+			? compileCatalogV3(definitions, options)
+			: compileCatalogV2(definitions, options);
 	return { ...project, artifact };
 }

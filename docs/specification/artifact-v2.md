@@ -64,6 +64,11 @@ extra values are rejected by TypeScript.
 The v2 invocation manifest records canonical and requested keys, alias usage, requested and fallback
 locales, resolved locale, content and release digests, release profile, and policy digest.
 
+In artifact v2, `trust` and `placement` are validated metadata. Rendering applies `encoding`, but
+`placement = "delimited-context"` does not automatically add a delimiter. Use artifact v3 when the runtime
+must enforce a structural boundary. This explicit version split keeps existing v2 rendered text and hashes
+unchanged.
+
 ## Compatibility
 
 `createCatalog()` dispatches structurally valid artifacts by `schemaVersion`; generated v2 factories call

@@ -75,6 +75,7 @@ export function loadProject(
 	configArgument?: string,
 	cwd = process.cwd(),
 	releaseProfile?: string,
+	options: { validateRequiredCoverage?: boolean } = {},
 ): LoadedProject {
 	const configPath = resolve(cwd, configArgument ?? "s11t.config.toml");
 	const configDirectory = dirname(configPath);
@@ -146,9 +147,17 @@ export function loadProject(
 				sourcePath,
 				config,
 				releaseProfile,
+				options,
 			);
 		}
-		return parseAndResolveAuthoringV2(input, displayFile, sourcePath, config, releaseProfile);
+		return parseAndResolveAuthoringV2(
+			input,
+			displayFile,
+			sourcePath,
+			config,
+			releaseProfile,
+			options,
+		);
 	});
 	const aliases = validateResolvedDocumentsV2(documents, config);
 	return { config, configPath, configDirectory, documents, sourceFiles, releaseProfile, aliases };
