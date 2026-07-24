@@ -266,23 +266,19 @@ pnpm test:packages
 
 ### 公開
 
-RuntimeとCLIは、ルートから1コマンドで既存のRelease workflowへdispatchできます。versionは環境変数ではなく、両パッケージのpackage.jsonから取得されます。
+RuntimeとCLIは、ルートから1コマンドでnpmへ公開できます。versionは環境変数ではなく、両パッケージのpackage.jsonから取得されます。
 
 ```sh
-# 実行内容だけを確認（workflowは開始しません）
+# 対象、version、公開順、検証内容を確認
 pnpm release:publish:plan
 
-# 初回公開
-pnpm release:publish:bootstrap
-
-# canary公開
-pnpm release:publish:canary
-
-# stable公開
+# 事前検証後、確認プロンプトを表示してstable公開
 pnpm release:publish
 ```
 
-実行前に変更をコミットしてpushし、GitHub CLIでログインしてください。各コマンドはnpmへ直接publishせず、認証、事前検証、2パッケージの公開、provenance、署名、公開後検証を行う[Release workflow](./.github/workflows/release.yml)を開始します。詳しい前提条件は[npm公開手順](./docs/release/npm-publishing.md)を参照してください。
+`release:publish`は、Gitがクリーンであること、npm認証、総合テスト、tarball内容、隔離consumer、依存監査、`npm publish --dry-run`を確認します。すべて成功した後、package.jsonのversion入力を求め、`s11tnext`、`s11tnext-cli`の順で公開してレジストリを検証します。CIなど対話入力できない環境では、planを確認してから`pnpm release:publish -- --yes`を使用できます。
+
+provenance付きのGitHub Actions公開が必要な場合は、`release:dispatch:bootstrap`、`release:dispatch:canary`、`release:dispatch:stable`を使用します。詳しい前提条件は[npm公開手順](./docs/release/npm-publishing.md)を参照してください。
 
 ### ライセンス
 
@@ -548,23 +544,19 @@ Main directories:
 
 ### Publishing
 
-Runtime and CLI releases can be dispatched from the repository root with one command. The version comes from both package.json files, not an environment variable.
+Runtime and CLI can be published to npm from the repository root with one command. The version comes from both package.json files, not an environment variable.
 
 ```sh
-# Preview the dispatch without starting the workflow
+# Review targets, version, order, and verification
 pnpm release:publish:plan
 
-# First publication
-pnpm release:publish:bootstrap
-
-# Canary publication
-pnpm release:publish:canary
-
-# Stable publication
+# Run preflight, ask for confirmation, and publish stable
 pnpm release:publish
 ```
 
-Commit and push the release state and authenticate the GitHub CLI before running a publish command. These commands do not publish directly from the local checkout. They start the existing [Release workflow](./.github/workflows/release.yml), which owns authentication, preflight checks, both package publications, provenance, signatures, and post-publication verification. See the [npm publishing runbook](./docs/release/npm-publishing.md) for the required repository and npm setup.
+`release:publish` verifies a clean Git state, npm authentication, the full test suite, tarball contents, an isolated consumer, dependency audit, and `npm publish --dry-run`. After every check passes, it asks for the package.json version, publishes `s11tnext` followed by `s11tnext-cli`, and verifies the registry. For a non-interactive environment, review the plan first and use `pnpm release:publish -- --yes`.
+
+For GitHub Actions publication with provenance, use `release:dispatch:bootstrap`, `release:dispatch:canary`, or `release:dispatch:stable`. See the [npm publishing runbook](./docs/release/npm-publishing.md) for all prerequisites.
 
 ### License
 

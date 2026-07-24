@@ -9,9 +9,9 @@ does not authorize a publish; every registry-changing step below is a maintainer
 - Both packages are a fixed Changesets group and must publish the same version.
 - `canary` is a commit-addressed snapshot and must never move `latest`.
 - `stable` is a normal SemVer version from the version PR and must publish from the exact `main` head.
-- `.github/workflows/release.yml` is the only npm publishing workflow. The root package commands described
-  below only dispatch that workflow; they never publish directly from the local checkout.
-- Stable publishing remains disabled until the repository variable
+- Local stable publication is available through `pnpm release:publish`; provenance-enabled bootstrap,
+  canary, and stable publication remain available through `.github/workflows/release.yml`.
+- GitHub Actions stable publishing remains disabled until the repository variable
   `S11TNEXT_STABLE_RELEASE_ENABLED` is explicitly set to `true`.
 
 The workflow validates an immutable 40-character commit SHA, package metadata, registry uniqueness,
@@ -38,6 +38,25 @@ Before any dispatch:
 Both package names are unscoped and public. S11tnext records the public registry explicitly in each
 package's `publishConfig`, and the dry-run also supplies `--access public`.
 
+## One-command local stable publish
+
+For an authenticated maintainer performing a direct stable release:
+
+```sh
+pnpm release:publish:plan
+pnpm release:publish
+```
+
+The plan command performs no network or registry mutation. The publish command reads the shared version
+from both package.json files, requires a clean Git checkout and npm authentication, then runs the complete
+stable release dry-run. Only after verification succeeds does it ask the maintainer to type the exact
+version. It publishes `s11tnext` first and `s11tnext-cli` second, then verifies both `latest` dist-tags.
+
+This is the simplest path for a maintainer already authenticated with npm. Use
+`pnpm release:publish -- --yes` only in a controlled non-interactive environment after reviewing the
+plan. A partial publish is immutable: if Runtime succeeds and CLI fails, inspect npm before retrying and
+do not attempt to republish the successful package version.
+
 ## One-command workflow dispatch
 
 The root package exposes convenience commands that read the shared release version from
@@ -45,20 +64,15 @@ The root package exposes convenience commands that read the shared release versi
 dispatch the existing GitHub Actions workflow:
 
 ```sh
-pnpm release:publish:plan
-pnpm release:publish:bootstrap
-pnpm release:publish:canary
-pnpm release:publish
+pnpm release:dispatch:bootstrap
+pnpm release:dispatch:canary
+pnpm release:dispatch:stable
 ```
 
-`release:publish` dispatches `stable`. The other commands select the channel named by their suffix.
 The commands require a clean, committed checkout and an authenticated GitHub CLI. Commit and push the
 exact release state before dispatching. The workflow remains responsible for npm authentication,
 pre-publication checks, publishing both packages, provenance, signatures, dist-tags, and registry
 verification.
-
-The plan command performs no dispatch and prints the package names, version, repository, commit,
-confirmation value, and resulting `gh workflow run` arguments. No version environment variable is used.
 
 ## One-time bootstrap
 
