@@ -6,6 +6,7 @@
   "additionalProperties": false,
   "required": [
     "format",
+    "artifactVersion",
     "compilerVersion",
     "releaseProfile",
     "policyDigest",
@@ -15,6 +16,7 @@
   ],
   "properties": {
     "format": { "const": "s11tnext.catalog" },
+    "artifactVersion": { "const": 2 },
     "compilerVersion": { "type": "string", "minLength": 1 },
     "releaseProfile": { "type": "string", "minLength": 1 },
     "policyDigest": { "$ref": "#/$defs/digest" },
@@ -56,11 +58,11 @@
       "additionalProperties": false,
       "required": ["required", "type", "trust", "placement", "encoding"],
       "properties": {
-        "required": { "const": true },
+        "required": { "type": "boolean" },
         "type": { "enum": ["string", "number", "boolean", "json"] },
         "trust": { "enum": ["trusted", "untrusted"] },
         "placement": { "enum": ["inline", "delimited-context"] },
-        "encoding": { "enum": ["raw", "json-string", "json-value"] }
+        "encoding": { "enum": ["raw", "delimited-text", "json-string", "json-value"] }
       },
       "allOf": [
         {
@@ -79,6 +81,16 @@
         {
           "if": { "properties": { "encoding": { "const": "json-string" } }, "required": ["encoding"] },
           "then": { "properties": { "type": { "enum": ["string", "number", "boolean"] } }, "required": ["type"] }
+        },
+        {
+          "if": { "properties": { "encoding": { "const": "delimited-text" } }, "required": ["encoding"] },
+          "then": {
+            "properties": {
+              "type": { "const": "string" },
+              "placement": { "const": "delimited-context" }
+            },
+            "required": ["type", "placement"]
+          }
         },
         {
           "if": { "properties": { "trust": { "const": "untrusted" } }, "required": ["trust"] },
@@ -111,13 +123,13 @@
     "section": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["id", "kind", "severity", "enforcement", "optimizable", "segments"],
+      "required": ["id", "kind", "severity", "optimizable", "omitIfEmpty", "segments"],
       "properties": {
         "id": { "type": "string", "minLength": 1 },
         "kind": { "enum": ["instruction", "runtime-fact", "tool-contract", "output-contract", "overlay"] },
         "severity": { "enum": ["must", "should", "may"] },
-        "enforcement": { "enum": ["prompt", "schema", "host"] },
         "optimizable": { "type": "boolean" },
+        "omitIfEmpty": { "type": "boolean" },
         "segments": {
           "type": "array",
           "items": { "$ref": "#/$defs/segment" }
@@ -144,6 +156,7 @@
         "key",
         "owner",
         "contentKind",
+        "messageRole",
         "sourceLocale",
         "requiredLocales",
         "variables",
@@ -155,6 +168,7 @@
         "key": { "$ref": "#/$defs/dotKey" },
         "owner": { "type": "string", "minLength": 1 },
         "contentKind": { "const": "text" },
+        "messageRole": { "enum": ["system", "user"] },
         "sourceLocale": { "$ref": "#/$defs/localeId" },
         "requiredLocales": {
           "type": "array",

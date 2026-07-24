@@ -8,6 +8,7 @@ function definition(): CanonicalContextDefinition {
 		key: "example.greeting",
 		owner: "examples",
 		contentKind: "text",
+		messageRole: "system",
 		sourceLocale: "ja-JP",
 		requiredLocales: ["ja-JP", "en-US"],
 		variables: {
@@ -24,8 +25,8 @@ function definition(): CanonicalContextDefinition {
 				id: "context.text",
 				kind: "instruction",
 				severity: "must",
-				enforcement: "prompt",
 				optimizable: false,
+				omitIfEmpty: false,
 				locales: {
 					"ja-JP": "こんにちは、[[name]]。\r\n",
 					"en-US": "Hello, [[name]].\n",
@@ -73,6 +74,34 @@ describe("pure compiler", () => {
 			provenance: { configPath: "b.toml", sourceFiles: ["contexts/b.context.toml"] },
 		});
 		expect(first.catalogDigest).toBe(second.catalogDigest);
+	});
+
+	it("includes message role in definition, release, and catalog identity", () => {
+		const system = definition();
+		const user = definition();
+		user.messageRole = "user";
+		const options = {
+			releaseProfile: "production",
+			provenance: {
+				configPath: "s11tnext.config.toml",
+				sourceFiles: ["contexts/greeting.context.toml"],
+			},
+		};
+
+		const systemArtifact = compileCatalog([system], options);
+		const userArtifact = compileCatalog([user], options);
+		const systemContext = systemArtifact.contexts["example.greeting"]!;
+		const userContext = userArtifact.contexts["example.greeting"]!;
+
+		expect(systemArtifact.artifactVersion).toBe(2);
+		expect(systemContext.messageRole).toBe("system");
+		expect(userContext.messageRole).toBe("user");
+		expect(userContext.definitionHash).not.toBe(systemContext.definitionHash);
+		expect(userContext.releaseDigest).not.toBe(systemContext.releaseDigest);
+		expect(userArtifact.catalogDigest).not.toBe(systemArtifact.catalogDigest);
+		expect(userContext.locales["ja-JP"]!.artifactHash).toBe(
+			systemContext.locales["ja-JP"]!.artifactHash,
+		);
 	});
 
 	it("does not retain mutable variable definitions from compiler input", () => {

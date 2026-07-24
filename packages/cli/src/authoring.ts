@@ -11,6 +11,7 @@ export type ResolutionOrigins = {
 	key: string;
 	owner: string;
 	contentKind: string;
+	messageRole: string;
 	sourceLocale: string;
 	requiredLocales: string;
 	variables: Record<string, string>;
@@ -117,17 +118,101 @@ function resolveOwner(key: string, config: S11tnextProjectConfig, file: string):
 function resolveRequiredLocales(
 	config: S11tnextProjectConfig,
 	releaseProfile: string,
+	key: string,
+	sourceLocale: string,
 	file: string,
-): string[] {
+): { values: string[]; source: string } {
 	const profile = Object.hasOwn(config.releaseProfiles, releaseProfile)
 		? config.releaseProfiles[releaseProfile]
 		: undefined;
 	if (profile === undefined) {
 		return issue(file, "S11TNEXT_RELEASE_PROFILE_NOT_FOUND", `Release profile not found: ${releaseProfile}`, []);
 	}
-	return profile.requiredLocales.map((locale) =>
-		locale === "$source" ? config.authoring.sourceLocale : locale,
+	const match = Object.entries(profile.requiredLocalesByKeyspace)
+		.filter(([prefix]) => key === prefix || key.startsWith(`${prefix}.`))
+		.sort(([left], [right]) => right.length - left.length || left.localeCompare(right))[0];
+	const requiredLocales = match?.[1] ?? profile.requiredLocales;
+	const values = requiredLocales.map((locale) =>
+		locale === "$source" ? sourceLocale : locale,
 	);
+	if (new Set(values).size !== values.length) {
+		return issue(
+			file,
+			"S11TNEXT_SOURCE_LOCALE_OVERRIDE",
+			"Required locales must remain unique after resolving the source locale",
+			["source_locale"],
+		);
+	}
+	return {
+		values,
+		source:
+			match === undefined
+				? `release_profiles.${releaseProfile}.required_locales`
+				: `release_profiles.${releaseProfile}.required_locales_by_keyspace.${match[0]}`,
+	};
+}
+
+function resolveSourceLocale(
+	source: UnknownRecord,
+	key: string,
+	config: S11tnextProjectConfig,
+	file: string,
+): { value: string; source: string } {
+	if (source.source_locale !== undefined) {
+		if (
+			typeof source.source_locale !== "string" ||
+			!LOCALE_PATTERN.test(source.source_locale)
+		) {
+			return issue(
+				file,
+				"S11TNEXT_SOURCE_INVALID",
+				"Invalid source locale",
+				["source_locale"],
+			);
+		}
+		return { value: source.source_locale, source: `${file}#source_locale` };
+	}
+	const match = Object.entries(config.keyspaces)
+		.filter(
+			([prefix, entry]) =>
+				entry.sourceLocale !== undefined &&
+				(key === prefix || key.startsWith(`${prefix}.`)),
+		)
+		.sort(([left], [right]) => right.length - left.length || left.localeCompare(right))[0];
+	if (match?.[1].sourceLocale !== undefined) {
+		return {
+			value: match[1].sourceLocale,
+			source: `keyspaces.${match[0]}.source_locale`,
+		};
+	}
+	return { value: config.authoring.sourceLocale, source: "authoring.source_locale" };
+}
+
+function resolveMessageRole(
+	source: UnknownRecord,
+	file: string,
+): {
+	value: CanonicalContextDefinition["messageRole"];
+	source: string;
+} {
+	if (source.message_role === undefined) {
+		return { value: "system", source: "built-in:system" };
+	}
+	if (
+		typeof source.message_role !== "string" ||
+		!["system", "user"].includes(source.message_role)
+	) {
+		return issue(
+			file,
+			"S11TNEXT_MESSAGE_ROLE_INVALID",
+			"message_role must be system or user",
+			["message_role"],
+		);
+	}
+	return {
+		value: source.message_role as CanonicalContextDefinition["messageRole"],
+		source: `${file}#message_role`,
+	};
 }
 
 function parseTranslations(
@@ -170,7 +255,10 @@ function parseVariables(
 		if (!VARIABLE_NAME_PATTERN.test(name)) issue(file, "S11TNEXT_SOURCE_INVALID", "Invalid variable name", path);
 		const variable = object(value, file, path);
 		if (Object.hasOwn(variable, "profile")) {
-			exactKeys(variable, ["profile"], ["profile"], file, path);
+			exactKeys(variable, ["profile", "required"], ["profile"], file, path);
+			if (variable.required !== undefined && typeof variable.required !== "boolean") {
+				issue(file, "S11TNEXT_SOURCE_INVALID", "Expected a boolean", [...path, "required"]);
+			}
 			const profileName = string(variable.profile, file, [...path, "profile"]);
 			const profile = Object.hasOwn(config.variableProfiles, profileName)
 				? config.variableProfiles[profileName]
@@ -178,17 +266,34 @@ function parseVariables(
 			if (profile === undefined) {
 				issue(file, "S11TNEXT_VARIABLE_PROFILE_NOT_FOUND", `Variable profile not found: ${profileName}`, [...path, "profile"]);
 			}
-			definitions[name] = { ...profile };
+			definitions[name] = {
+				...profile,
+				required: variable.required ?? profile.required,
+			};
 			origins[name] = `variable_profiles.${profileName}`;
 			continue;
 		}
-		exactKeys(variable, ["type", "trust", "placement", "encoding"], ["type", "trust", "placement", "encoding"], file, path);
+		exactKeys(
+			variable,
+			["required", "type", "trust", "placement", "encoding"],
+			["type", "trust", "placement", "encoding"],
+			file,
+			path,
+		);
+		if (variable.required !== undefined && typeof variable.required !== "boolean") {
+			issue(file, "S11TNEXT_SOURCE_INVALID", "Expected a boolean", [...path, "required"]);
+		}
 		const definition: CanonicalVariableDefinition = {
-			required: true,
+			required: variable.required ?? true,
 			type: oneOf(variable.type, ["string", "number", "boolean", "json"], file, [...path, "type"]),
 			trust: oneOf(variable.trust, ["trusted", "untrusted"], file, [...path, "trust"]),
 			placement: oneOf(variable.placement, ["inline", "delimited-context"], file, [...path, "placement"]),
-			encoding: oneOf(variable.encoding, ["raw", "json-string", "json-value"], file, [...path, "encoding"]),
+			encoding: oneOf(
+				variable.encoding,
+				["raw", "delimited-text", "json-string", "json-value"],
+				file,
+				[...path, "encoding"],
+			),
 		};
 		if (definition.trust === "untrusted" && definition.encoding === "raw") {
 			issue(file, "S11TNEXT_UNSAFE_UNTRUSTED_RAW", "Untrusted variables cannot use raw encoding", [...path, "encoding"]);
@@ -206,6 +311,17 @@ function parseVariables(
 		}
 		if (definition.encoding === "json-string" && definition.type === "json") {
 			issue(file, "S11TNEXT_ENCODING_TYPE_MISMATCH", "json-string does not support json variables", [...path, "encoding"]);
+		}
+		if (
+			definition.encoding === "delimited-text" &&
+			(definition.type !== "string" || definition.placement !== "delimited-context")
+		) {
+			issue(
+				file,
+				"S11TNEXT_ENCODING_TYPE_MISMATCH",
+				"delimited-text requires a string variable with delimited-context placement",
+				[...path, "encoding"],
+			);
 		}
 		definitions[name] = definition;
 		origins[name] = `${file}#variables.${name}`;
@@ -239,6 +355,17 @@ function validateVariableReferences(
 				}
 			}
 			placeholdersByLocale.set(locale, placeholders);
+		}
+		if (
+			section.omitIfEmpty &&
+			(placeholdersByLocale.get(sourceLocale)?.size ?? 0) === 0
+		) {
+			issue(
+				file,
+				"S11TNEXT_SOURCE_INVALID",
+				"omit_if_empty requires at least one variable placeholder",
+				["sections", sectionIndex, "omit_if_empty"],
+			);
 		}
 		const sourcePlaceholders = placeholdersByLocale.get(sourceLocale);
 		if (sourcePlaceholders === undefined) {
@@ -292,22 +419,22 @@ function validateCoverage(
 function simpleSection(
 	text: unknown,
 	translations: unknown,
-	config: S11tnextProjectConfig,
+	sourceLocale: string,
 	file: string,
 ): CanonicalSectionDefinition {
 	return {
 		id: "context.text",
 		kind: "instruction",
 		severity: "must",
-		enforcement: "prompt",
 		optimizable: false,
+		omitIfEmpty: false,
 		locales: {
-			[config.authoring.sourceLocale]: normalizeText(text, file, ["text"]),
+			[sourceLocale]: normalizeText(text, file, ["text"]),
 			...parseTranslations(
 				translations,
 				file,
 				["translations"],
-				config.authoring.sourceLocale,
+				sourceLocale,
 			),
 		},
 	};
@@ -316,6 +443,7 @@ function simpleSection(
 function parseSections(
 	input: unknown,
 	config: S11tnextProjectConfig,
+	sourceLocale: string,
 	file: string,
 ): CanonicalSectionDefinition[] {
 	if (!Array.isArray(input) || input.length === 0) {
@@ -327,28 +455,89 @@ function parseSections(
 		const section = object(value, file, path);
 		exactKeys(
 			section,
-			["id", "kind", "severity", "enforcement", "optimizable", "text", "translations"],
-			["id", "kind", "severity", "enforcement", "optimizable", "text"],
+			[
+				"id",
+				"profile",
+				"kind",
+				"severity",
+				"optimizable",
+				"omit_if_empty",
+				"text",
+				"translations",
+			],
+			["id", "text"],
 			file,
 			path,
 		);
 		const id = string(section.id, file, [...path, "id"]);
 		if (seen.has(id)) issue(file, "S11TNEXT_SECTION_DUPLICATE_ID", `Duplicate section ID: ${id}`, [...path, "id"]);
 		seen.add(id);
-		if (typeof section.optimizable !== "boolean") issue(file, "S11TNEXT_SOURCE_INVALID", "Expected a boolean", [...path, "optimizable"]);
+		if (section.omit_if_empty !== undefined && typeof section.omit_if_empty !== "boolean") {
+			issue(file, "S11TNEXT_SOURCE_INVALID", "Expected a boolean", [...path, "omit_if_empty"]);
+		}
+		let metadata: Pick<
+			CanonicalSectionDefinition,
+			"kind" | "severity" | "optimizable"
+		>;
+		if (section.profile !== undefined) {
+			if (
+				section.kind !== undefined ||
+				section.severity !== undefined ||
+				section.optimizable !== undefined
+			) {
+				issue(
+					file,
+					"S11TNEXT_SOURCE_INVALID",
+					"Section profiles cannot be combined with inline metadata",
+					path,
+				);
+			}
+			const profileName = string(section.profile, file, [...path, "profile"]);
+			const profile = Object.hasOwn(config.sectionProfiles, profileName)
+				? config.sectionProfiles[profileName]
+				: undefined;
+			if (profile === undefined) {
+				issue(
+					file,
+					"S11TNEXT_SECTION_PROFILE_NOT_FOUND",
+					`Section profile not found: ${profileName}`,
+					[...path, "profile"],
+				);
+			}
+			metadata = profile;
+		} else {
+			if (
+				section.kind === undefined ||
+				section.severity === undefined ||
+				section.optimizable === undefined
+			) {
+				issue(
+					file,
+					"S11TNEXT_SOURCE_INVALID",
+					"Section requires a profile or complete inline metadata",
+					path,
+				);
+			}
+			if (typeof section.optimizable !== "boolean") {
+				issue(file, "S11TNEXT_SOURCE_INVALID", "Expected a boolean", [...path, "optimizable"]);
+			}
+			metadata = {
+				kind: oneOf(section.kind, ["instruction", "runtime-fact", "tool-contract", "output-contract", "overlay"], file, [...path, "kind"]),
+				severity: oneOf(section.severity, ["must", "should", "may"], file, [...path, "severity"]),
+				optimizable: section.optimizable,
+			};
+		}
 		return {
 			id,
-			kind: oneOf(section.kind, ["instruction", "runtime-fact", "tool-contract", "output-contract", "overlay"], file, [...path, "kind"]),
-			severity: oneOf(section.severity, ["must", "should", "may"], file, [...path, "severity"]),
-			enforcement: oneOf(section.enforcement, ["prompt", "schema", "host"], file, [...path, "enforcement"]),
-			optimizable: section.optimizable,
+			...metadata,
+			omitIfEmpty: section.omit_if_empty ?? false,
 			locales: {
-				[config.authoring.sourceLocale]: normalizeText(section.text, file, [...path, "text"]),
+				[sourceLocale]: normalizeText(section.text, file, [...path, "text"]),
 				...parseTranslations(
 					section.translations,
 					file,
 					[...path, "translations"],
-					config.authoring.sourceLocale,
+					sourceLocale,
 				),
 			},
 		};
@@ -364,7 +553,21 @@ export function parseAndResolveAuthoring(
 	options: { validateRequiredCoverage?: boolean } = {},
 ): ResolvedAuthoringDocument {
 	const source = object(input, file, []);
-	exactKeys(source, ["content_kind", "text", "translations", "variables", "sections"], [], file, []);
+	exactKeys(
+		source,
+		[
+			"content_kind",
+			"message_role",
+			"source_locale",
+			"text",
+			"translations",
+			"variables",
+			"sections",
+		],
+		[],
+		file,
+		[],
+	);
 	const key = deriveKey(sourcePath, file);
 	if (source.content_kind !== undefined && source.content_kind !== "text") {
 		issue(file, "S11TNEXT_SOURCE_INVALID", "Only text content is supported", ["content_kind"]);
@@ -376,18 +579,26 @@ export function parseAndResolveAuthoring(
 		issue(file, "S11TNEXT_SOURCE_SHAPE_CONFLICT", "Root translations are only valid with root text", ["translations"]);
 	}
 	const owner = resolveOwner(key, config, file);
-	const requiredLocales = resolveRequiredLocales(config, releaseProfile, file);
+	const messageRole = resolveMessageRole(source, file);
+	const sourceLocale = resolveSourceLocale(source, key, config, file);
+	const requiredLocales = resolveRequiredLocales(
+		config,
+		releaseProfile,
+		key,
+		sourceLocale.value,
+		file,
+	);
 	const variables = parseVariables(source.variables, config, file);
 	const sections = hasText
-		? [simpleSection(source.text, source.translations, config, file)]
-		: parseSections(source.sections, config, file);
+		? [simpleSection(source.text, source.translations, sourceLocale.value, file)]
+		: parseSections(source.sections, config, sourceLocale.value, file);
 	validateCoverage(
 		sections,
-		requiredLocales,
+		requiredLocales.values,
 		file,
 		options.validateRequiredCoverage !== false,
 	);
-	validateVariableReferences(sections, variables.definitions, config.authoring.sourceLocale, file);
+	validateVariableReferences(sections, variables.definitions, sourceLocale.value, file);
 	return {
 		file,
 		sourcePath,
@@ -395,8 +606,9 @@ export function parseAndResolveAuthoring(
 			key,
 			owner: owner.value,
 			contentKind: "text",
-			sourceLocale: config.authoring.sourceLocale,
-			requiredLocales,
+			messageRole: messageRole.value,
+			sourceLocale: sourceLocale.value,
+			requiredLocales: requiredLocales.values,
 			variables: variables.definitions,
 			sections,
 		},
@@ -404,8 +616,9 @@ export function parseAndResolveAuthoring(
 			key: `path:${sourcePath}`,
 			owner: owner.source,
 			contentKind: "built-in:text",
-			sourceLocale: "authoring.source_locale",
-			requiredLocales: `release_profiles.${releaseProfile}`,
+			messageRole: messageRole.source,
+			sourceLocale: sourceLocale.source,
+			requiredLocales: requiredLocales.source,
 			variables: variables.origins,
 		},
 	};

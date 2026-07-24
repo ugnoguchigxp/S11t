@@ -44,7 +44,7 @@
     "release:dispatch:canary": "node scripts/dispatch-release.mjs canary",
     "release:dispatch:stable": "node scripts/dispatch-release.mjs stable",
     "deploy:nightworkers-canary": "node scripts/deploy-nightworkers-canary.mjs",
-    "verify": "pnpm check:versions && pnpm typecheck && pnpm test:coverage && pnpm build && pnpm test:type-fixtures && pnpm test:no-node-builtins && pnpm test:browser-bundle && pnpm exec s11tnext --help"
+    "verify": "pnpm check:versions && pnpm typecheck && pnpm build && pnpm test:coverage && pnpm test:type-fixtures && pnpm test:no-node-builtins && pnpm test:browser-bundle && pnpm exec s11tnext --help"
   },
   "devDependencies": {
     "@changesets/cli": "2.31.1",

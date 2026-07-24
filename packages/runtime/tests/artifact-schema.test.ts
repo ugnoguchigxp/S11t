@@ -4,13 +4,18 @@ import Ajv2020 from "ajv/dist/2020.js";
 import { describe, expect, it } from "vitest";
 
 import { compileCatalog, type CanonicalContextDefinition } from "../src/compiler.js";
-import { isCatalogArtifact } from "../src/artifact-schema.js";
+import {
+	assertCatalogArtifact,
+	isCatalogArtifact,
+} from "../src/artifact-schema.js";
+import { S11tnextError } from "../src/diagnostics.js";
 
 function artifact() {
 	const definition: CanonicalContextDefinition = {
 		key: "example.greeting",
 		owner: "examples",
 		contentKind: "text",
+		messageRole: "system",
 		sourceLocale: "en-US",
 		requiredLocales: ["en-US"],
 		variables: {},
@@ -19,8 +24,8 @@ function artifact() {
 				id: "context.text",
 				kind: "instruction",
 				severity: "must",
-				enforcement: "prompt",
 				optimizable: false,
+				omitIfEmpty: false,
 				locales: { "en-US": "Hello" },
 			},
 		],
@@ -39,12 +44,31 @@ const validateJsonSchema = new Ajv2020({ strict: true }).compile(schema);
 describe("artifact schema", () => {
 	it("keeps runtime structural validation and JSON Schema aligned", () => {
 		const input = artifact();
+		expect(input.artifactVersion).toBe(2);
 		expect(isCatalogArtifact(input)).toBe(true);
 		expect(validateJsonSchema(input)).toBe(true);
 		const invalid = structuredClone(input) as unknown as Record<string, unknown>;
 		invalid.extra = true;
 		expect(isCatalogArtifact(invalid)).toBe(false);
 		expect(validateJsonSchema(invalid)).toBe(false);
+	});
+
+	it.each([
+		{ name: "missing", version: undefined },
+		{ name: "legacy", version: 1 },
+		{ name: "future", version: 3 },
+	])("rejects $name artifact versions with a migration diagnostic", ({ version }) => {
+		const input = artifact() as unknown as Record<string, unknown>;
+		if (version === undefined) delete input.artifactVersion;
+		else input.artifactVersion = version;
+
+		expect(() => assertCatalogArtifact(input)).toThrowError(
+			expect.objectContaining<S11tnextError>({
+				code: "S11TNEXT_ARTIFACT_VERSION_UNSUPPORTED",
+				path: ["artifactVersion"],
+			}),
+		);
+		expect(validateJsonSchema(input)).toBe(false);
 	});
 
 	it.each([
@@ -100,6 +124,22 @@ describe("artifact schema", () => {
 			placement: "inline",
 			encoding: "json-string",
 		};
+		expect(isCatalogArtifact(input)).toBe(false);
+		expect(validateJsonSchema(input)).toBe(false);
+	});
+
+	it("rejects removed enforcement claims in compiled sections", () => {
+		const input = artifact();
+		const section = input.contexts["example.greeting"]!.locales["en-US"]!
+			.sections[0] as unknown as Record<string, unknown>;
+		section.enforcement = "host";
+		expect(isCatalogArtifact(input)).toBe(false);
+		expect(validateJsonSchema(input)).toBe(false);
+	});
+
+	it("rejects unsupported message roles in both validators", () => {
+		const input = artifact();
+		input.contexts["example.greeting"]!.messageRole = "assistant" as never;
 		expect(isCatalogArtifact(input)).toBe(false);
 		expect(validateJsonSchema(input)).toBe(false);
 	});

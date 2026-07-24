@@ -48,8 +48,8 @@ function definitionFromCompiled(
 					candidate.id !== section.id ||
 					candidate.kind !== section.kind ||
 					candidate.severity !== section.severity ||
-					candidate.enforcement !== section.enforcement ||
-					candidate.optimizable !== section.optimizable
+					candidate.optimizable !== section.optimizable ||
+					candidate.omitIfEmpty !== section.omitIfEmpty
 				) {
 					throw new S11tnextError(
 						"S11TNEXT_ARTIFACT_INVALID",
@@ -63,8 +63,8 @@ function definitionFromCompiled(
 				id: section.id,
 				kind: section.kind,
 				severity: section.severity,
-				enforcement: section.enforcement,
 				optimizable: section.optimizable,
+				omitIfEmpty: section.omitIfEmpty,
 				locales,
 			};
 		},
@@ -73,6 +73,7 @@ function definitionFromCompiled(
 		key: context.key,
 		owner: context.owner,
 		contentKind: "text",
+		messageRole: context.messageRole,
 		sourceLocale: context.sourceLocale,
 		requiredLocales: [...context.requiredLocales],
 		variables: context.variables,
@@ -131,6 +132,7 @@ export function assertCatalogIntegrity(artifact: S11tnextCatalogArtifact): void 
 			const compiledLocale = context.locales[locale];
 			if (compiledLocale === undefined) continue;
 			for (const [sectionIndex, section] of compiledLocale.sections.entries()) {
+				const sectionVariableNames = variableNames(section.segments);
 				if (locale === context.sourceLocale) {
 					if (sectionIds.has(section.id)) {
 						throw new S11tnextError(
@@ -148,6 +150,21 @@ export function assertCatalogIntegrity(artifact: S11tnextCatalogArtifact): void 
 						);
 					}
 					sectionIds.add(section.id);
+					if (section.omitIfEmpty && sectionVariableNames.size === 0) {
+						throw new S11tnextError(
+							"S11TNEXT_ARTIFACT_INVALID",
+							"omitIfEmpty sections must reference at least one variable",
+							[
+								"contexts",
+								key,
+								"locales",
+								locale,
+								"sections",
+								sectionIndex,
+								"omitIfEmpty",
+							],
+						);
+					}
 				}
 				for (const [segmentIndex, segment] of section.segments.entries()) {
 					if (segment.type === "variable") {
@@ -175,7 +192,7 @@ export function assertCatalogIntegrity(artifact: S11tnextCatalogArtifact): void 
 					sourceSection !== undefined &&
 					!sameNames(
 						variableNames(sourceSection.segments),
-						variableNames(section.segments),
+						sectionVariableNames,
 					)
 				) {
 					throw new S11tnextError(

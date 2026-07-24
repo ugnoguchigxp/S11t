@@ -5,11 +5,11 @@ import {
 } from "./catalog-shared.js";
 import type {
 	CatalogBinding,
-	SystemContextInvocation,
+	PromptInvocation,
 } from "./catalog-types.js";
 import { S11tnextError } from "./diagnostics.js";
 import { encodeValue } from "./encoding.js";
-import { hashRendered } from "./hash.js";
+import { hashPromptMessage, hashRendered } from "./hash.js";
 import type { S11tnextCatalogArtifact } from "./types.js";
 
 const LOCALE_PATTERN = /^[A-Za-z]{2,8}(?:-[A-Za-z0-9]{1,8})*$/;
@@ -26,7 +26,7 @@ export function validateBinding(
 	for (const key of Reflect.ownKeys(source)) {
 		if (
 			typeof key !== "string" ||
-			!["instructionLocale", "fallbackLocales"].includes(key)
+			!["instructionLocale", "fallbackLocales", "trailingNewline"].includes(key)
 		) {
 			throw new S11tnextError(
 				"S11TNEXT_VALUE_INVALID",
@@ -135,9 +135,25 @@ export function validateBinding(
 			["fallbackLocales"],
 		);
 	}
+	const trailingNewlineDescriptor = Object.getOwnPropertyDescriptor(
+		source,
+		"trailingNewline",
+	);
+	const trailingNewline =
+		trailingNewlineDescriptor !== undefined && "value" in trailingNewlineDescriptor
+			? trailingNewlineDescriptor.value
+			: true;
+	if (typeof trailingNewline !== "boolean") {
+		throw new S11tnextError(
+			"S11TNEXT_VALUE_INVALID",
+			"trailingNewline must be a boolean",
+			["trailingNewline"],
+		);
+	}
 	return {
 		instructionLocale,
 		fallbackLocales: fallbackLocales as string[],
+		trailingNewline,
 	};
 }
 
@@ -145,12 +161,32 @@ function delimitEncodedValue(name: string, value: string): string {
 	return `<S11TNEXT_DELIMITED_CONTEXT variable="${name}">\n${value}\n</S11TNEXT_DELIMITED_CONTEXT>`;
 }
 
+function shouldOmitSection(
+	section: S11tnextCatalogArtifact["contexts"][string]["locales"][string]["sections"][number],
+	values: Record<string, unknown>,
+): boolean {
+	if (!section.omitIfEmpty) return false;
+	const variableNames = [
+		...new Set(
+			section.segments.flatMap((segment) =>
+				segment.type === "variable" ? [segment.name] : [],
+			),
+		),
+	];
+	return (
+		variableNames.length > 0 &&
+		variableNames.every(
+			(name) => !Object.hasOwn(values, name) || values[name] === "",
+		)
+	);
+}
+
 export function invokeContext(
 	artifact: S11tnextCatalogArtifact,
 	key: string,
 	valuesInput: unknown,
 	binding: CatalogBinding,
-): SystemContextInvocation {
+): PromptInvocation {
 	if (!Object.hasOwn(artifact.contexts, key)) {
 		throw new S11tnextError("S11TNEXT_CONTEXT_NOT_FOUND", `Context not found: ${key}`, [
 			key,
@@ -172,8 +208,8 @@ export function invokeContext(
 		);
 	}
 	const values = valuesRecord(valuesInput);
-	for (const name of Object.keys(context.variables)) {
-		if (!Object.hasOwn(values, name)) {
+	for (const [name, definition] of Object.entries(context.variables)) {
+		if (definition.required && !Object.hasOwn(values, name)) {
 			throw new S11tnextError("S11TNEXT_VALUE_MISSING", `Missing value: ${name}`, [
 				name,
 			]);
@@ -187,8 +223,15 @@ export function invokeContext(
 		}
 	}
 	const encodedValues: Record<string, string> = {};
+	const runtimeValues: Record<string, unknown> = {};
 	for (const [name, definition] of Object.entries(context.variables)) {
-		const encoded = encodeValue(values[name], definition, [name], {
+		if (!Object.hasOwn(values, name)) {
+			encodedValues[name] = "";
+			continue;
+		}
+		const value = values[name];
+		runtimeValues[name] = value;
+		const encoded = encodeValue(value, definition, [name], {
 			escapeBoundaryCharacters: definition.trust === "untrusted",
 		});
 		encodedValues[name] =
@@ -197,14 +240,27 @@ export function invokeContext(
 				: encoded;
 	}
 	const locale = context.locales[resolvedLocale]!;
-	const text = `${locale.sections
-		.map((section) => renderSection(section, encodedValues))
-		.join("\n")}\n`;
+	const includedSections = locale.sections.filter(
+		(section) => !shouldOmitSection(section, runtimeValues),
+	);
+	const renderedSections = includedSections.map((section) =>
+		renderSection(section, encodedValues),
+	);
+	const text =
+		renderedSections.length === 0
+			? ""
+			: `${renderedSections.join("\n")}${binding.trailingNewline === false ? "" : "\n"}`;
 	return deepFreeze({
 		key,
+		role: context.messageRole,
 		content: { kind: "text", text },
 		manifest: {
 			key,
+			messageRole: context.messageRole,
+			messageHash: hashPromptMessage({
+				role: context.messageRole,
+				text,
+			}),
 			catalogDigest: artifact.catalogDigest,
 			releaseDigest: context.releaseDigest,
 			definitionHash: context.definitionHash,
@@ -215,7 +271,8 @@ export function invokeContext(
 			resolvedLocale,
 			sourceLocale: context.sourceLocale,
 			fallbackUsed: resolvedLocale !== binding.instructionLocale,
-			sectionIds: locale.sections.map((section) => section.id),
+			trailingNewline: binding.trailingNewline !== false,
+			sectionIds: includedSections.map((section) => section.id),
 			compilerVersion: artifact.compilerVersion,
 			releaseProfile: artifact.releaseProfile,
 			policyDigest: artifact.policyDigest,

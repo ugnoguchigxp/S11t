@@ -18,7 +18,7 @@ import type {
 	S11tnextCompiledSection,
 	TemplateSegment,
 } from "./types.js";
-import { COMPILER_VERSION } from "./version.js";
+import { ARTIFACT_VERSION, COMPILER_VERSION } from "./version.js";
 
 export type {
 	CanonicalContextDefinition,
@@ -26,7 +26,7 @@ export type {
 	CanonicalVariableDefinition,
 } from "./canonical-definition.js";
 
-export { COMPILER_VERSION } from "./version.js";
+export { ARTIFACT_VERSION, COMPILER_VERSION } from "./version.js";
 
 export type CompileCatalogOptions = {
 	releaseProfile: string;
@@ -68,6 +68,7 @@ function normalizedDefinition(
 		key: definition.key,
 		owner: definition.owner,
 		contentKind: "text",
+		messageRole: definition.messageRole,
 		sourceLocale: definition.sourceLocale,
 		requiredLocales: [...definition.requiredLocales],
 		variables: Object.fromEntries(
@@ -76,7 +77,7 @@ function normalizedDefinition(
 				.map(([name, variable]) => [
 					name,
 					{
-						required: true as const,
+						required: variable.required,
 						type: variable.type,
 						trust: variable.trust,
 						placement: variable.placement,
@@ -88,8 +89,8 @@ function normalizedDefinition(
 			id: section.id,
 			kind: section.kind,
 			severity: section.severity,
-			enforcement: section.enforcement,
 			optimizable: section.optimizable,
+			omitIfEmpty: section.omitIfEmpty,
 			locales: Object.fromEntries(
 				Object.entries(section.locales)
 					.sort(([left], [right]) => compareCodeUnits(left, right))
@@ -112,8 +113,8 @@ function compileSections(
 			id: section.id,
 			kind: section.kind,
 			severity: section.severity,
-			enforcement: section.enforcement,
 			optimizable: section.optimizable,
+			omitIfEmpty: section.omitIfEmpty,
 			segments: tokenizeTemplate(text),
 		};
 	});
@@ -148,6 +149,7 @@ function compileContext(definitionInput: CanonicalContextDefinition): S11tnextCo
 		key: definition.key,
 		owner: definition.owner,
 		contentKind: "text",
+		messageRole: definition.messageRole,
 		sourceLocale: definition.sourceLocale,
 		requiredLocales: [...definition.requiredLocales],
 		variables: definition.variables,
@@ -182,6 +184,7 @@ export function compileCatalog(
 	});
 	const artifact: S11tnextCatalogArtifact = {
 		format: "s11tnext.catalog",
+		artifactVersion: ARTIFACT_VERSION,
 		compilerVersion: COMPILER_VERSION,
 		releaseProfile: options.releaseProfile,
 		policyDigest,

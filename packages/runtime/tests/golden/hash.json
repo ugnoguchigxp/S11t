@@ -1,10 +1,10 @@
 {
-  "definitionHash": "sha256:d4a63950f322002e24991afdecdfb1797385ca1f33adfeb207655ebf9030a6f1",
+  "definitionHash": "sha256:2af419f83c2f0f803e8829b5a488a0f39f705e355fe5262d871cb0be8626a5ee",
   "artifactHashes": {
-    "en-US": "sha256:c63114bebcd328a378ed7773a77b2be25ac6d29c898beee3e74887828d95f6e7",
-    "ja-JP": "sha256:6750e3349289b98f9d077138a2f9f5d9b9c2cbb95b13fe0a99e4e3347144681e"
+    "en-US": "sha256:9570ec5126c36b659a5ee67c267eb06f289af9f4a8dc825ff94e85304c124343",
+    "ja-JP": "sha256:c8d1b5d030acb4bb9c52b92298362ffb9f501ff767fd62a984c90f49efb06bc4"
   },
-  "releaseDigest": "sha256:153f8daf5ca6239979e8cbf0475bc70ebbecdb21d341c084ecfa9b313562e0c7",
+  "releaseDigest": "sha256:a3d2a765d5a429c5f635acad7ab6b9ff7b745757f6bf76ebe3e2332347eb6555",
   "policyDigest": "sha256:e256ae5d810f0efb4cf6a74ff5cdfc5d3c87bbe6c06998d262f4f679e3f074ac",
-  "catalogDigest": "sha256:bc0f137982d198f2860dd316f5bda4315a8dbc0528543445219f2c83ef25bb28"
+  "catalogDigest": "sha256:a0abc198cbfa884587b20612cd496321f2efabb99f1a62e6555d9b1701b745d9"
 }

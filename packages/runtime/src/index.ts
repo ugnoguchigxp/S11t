@@ -7,6 +7,10 @@ export type {
 	CatalogBinding,
 	CatalogBindingResolver,
 	CatalogContract,
+	CompositionReceipt,
+	ContractRoles,
+	PromptDescription,
+	PromptInvocation,
 	RequestAudit,
 	RequestRenderTraceEntry,
 	RuntimeValues,
@@ -15,12 +19,19 @@ export type {
 	TextRenderer,
 	TextRendererObject,
 } from "./catalog.js";
-export { hashRendered, verifyRenderedHash } from "./hash.js";
+export {
+	hashPromptMessage,
+	hashRendered,
+	verifyPromptMessageHash,
+	verifyRenderedHash,
+} from "./hash.js";
 export type { S11tnextDigest } from "./hash.js";
 export { S11tnextError } from "./diagnostics.js";
 export type { S11tnextErrorCode } from "./diagnostics.js";
+export { ARTIFACT_VERSION } from "./version.js";
 export type {
 	JsonValue,
+	PromptMessageRole,
 	S11tnextCatalogArtifact,
 	S11tnextCompiledContext,
 	S11tnextCompiledLocale,

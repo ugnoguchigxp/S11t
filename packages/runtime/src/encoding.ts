@@ -81,7 +81,7 @@ function escapeJsonString(value: string): string {
 	return escapeBoundaryCharacters(JSON.stringify(value));
 }
 
-function escapeBoundaryCharacters(value: string): string {
+export function escapeBoundaryCharacters(value: string): string {
 	return value.replace(/[<>&\u2028\u2029]/g, (character) => {
 		const code = character.codePointAt(0);
 		return `\\u${code?.toString(16).padStart(4, "0")}`;
@@ -112,6 +112,9 @@ export function encodeValue(
 	}
 
 	if (definition.encoding === "raw") return value as string;
+	if (definition.encoding === "delimited-text") {
+		return escapeBoundaryCharacters(value as string);
+	}
 	if (definition.encoding === "json-string") return escapeJsonString(String(value));
 	jsonValue ??= snapshotJsonValueInternal(value, path, new Set<object>());
 	const encoded = canonicalJson(jsonValue);

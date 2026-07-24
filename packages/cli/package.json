@@ -1,6 +1,6 @@
 {
   "name": "s11tnext-cli",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "TOML authoring and build CLI for S11tnext",
   "keywords": [
     "llm",

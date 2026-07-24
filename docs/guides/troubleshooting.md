@@ -2,11 +2,7 @@
 
 ## npm reports `E404` for `s11tnext` or `s11tnext-cli`
 
-The packages are not available from the npm registry before the first repository bootstrap. Use the
-pnpm workspace for repository development. Do not treat `0.0.0` tarballs as published production
-packages.
-
-After the first release, verify the requested dist-tag and registry:
+Both packages are published on the public npm registry. Verify the requested dist-tag and registry:
 
 ```sh
 npm view s11tnext dist-tags
@@ -43,6 +39,10 @@ implicitly. Inspect the catalog before changing release policy:
 s11tnext inspect --coverage --locale en-US --fallback-locale ja-JP \
   --release-profile development --format json
 ```
+
+For catalogs with document or keyspace source-locale overrides, `sourceLocale` remains the project
+default for compatibility. Use `sourceLocales` and `sourceLocalesByContext` to inspect the effective
+values. Required locale policy is similarly available in `requiredLocalesByContext`.
 
 ## Human diagnostics are difficult to process
 

@@ -12,8 +12,8 @@ import type {
 	Catalog,
 	CatalogBinding,
 	DefaultContract,
+	PromptInvocation,
 	RuntimeValues,
-	SystemContextInvocation,
 	TextRenderer,
 	TextRendererObject,
 } from "./catalog-types.js";
@@ -29,6 +29,10 @@ export type {
 	CatalogBinding,
 	CatalogBindingResolver,
 	CatalogContract,
+	CompositionReceipt,
+	ContractRoles,
+	PromptDescription,
+	PromptInvocation,
 	RequestAudit,
 	RequestRenderTraceEntry,
 	RuntimeValues,
@@ -44,7 +48,7 @@ function bindInvocation<C extends DefaultContract>(
 ): ReturnType<Catalog<C>["bind"]> {
 	const snapshot = validateBinding(binding);
 	return ((key: string, values: RuntimeValues) =>
-		invokeContext(artifact, key, values, snapshot)) as ReturnType<
+		invokeContext(artifact, key, values, snapshot)) as unknown as ReturnType<
 		Catalog<C>["bind"]
 	>;
 }
@@ -52,10 +56,10 @@ function bindInvocation<C extends DefaultContract>(
 function textRenderer<C extends DefaultContract>(
 	bound: ReturnType<Catalog<C>["bind"]>,
 ): TextRenderer<C> {
-	const invokeBound = bound as (
+	const invokeBound = bound as unknown as (
 		key: string,
 		values: RuntimeValues,
-	) => SystemContextInvocation;
+	) => PromptInvocation;
 	return Object.freeze(
 		((key: string, values: RuntimeValues) =>
 			invokeBound(key, values).content.text) as TextRenderer<C>,
@@ -84,6 +88,7 @@ function createCatalogBase<C extends DefaultContract = DefaultContract>(
 					key: context.key,
 					owner: context.owner,
 					contentKind: context.contentKind,
+					messageRole: context.messageRole,
 					sourceLocale: context.sourceLocale,
 					requiredLocales: [...context.requiredLocales],
 					availableLocales: Object.keys(context.locales).sort(compareCodeUnits),
@@ -146,10 +151,10 @@ function createCatalogBase<C extends DefaultContract = DefaultContract>(
 				((key: string, values: RuntimeValues) => {
 					const bound = bind(resolveBinding());
 					return (
-						bound as (
+						bound as unknown as (
 							contextKey: string,
 							input: RuntimeValues,
-						) => SystemContextInvocation
+						) => PromptInvocation
 					)(key, values).content.text;
 				}) as TextRenderer<C>,
 			),

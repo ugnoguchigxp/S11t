@@ -1,0 +1,18 @@
+source_dir = "contexts"
+out_dir = ".s11tnext"
+
+[authoring]
+source_locale = "ja-JP"
+
+[governance]
+require_owner = true
+
+[keyspaces.english]
+owner = "docs"
+source_locale = "en-US"
+
+[keyspaces.french]
+owner = "docs"
+
+[release_profiles.development]
+required_locales = ["$source"]

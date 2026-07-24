@@ -7,8 +7,10 @@ import {
 	hashArtifact,
 	hashCatalog,
 	hashDefinition,
+	hashPromptMessage,
 	hashPolicy,
 	hashRelease,
+	verifyPromptMessageHash,
 } from "../src/hash.js";
 import type { S11tnextCompiledSection } from "../src/types.js";
 
@@ -28,6 +30,7 @@ const definition: CanonicalContextDefinition = {
 	key: "example.greeting",
 	owner: "examples",
 	contentKind: "text",
+	messageRole: "system",
 	sourceLocale: "en-US",
 	requiredLocales: ["en-US", "ja-JP"],
 	variables: {
@@ -44,8 +47,8 @@ const definition: CanonicalContextDefinition = {
 			id: "context.text",
 			kind: "instruction",
 			severity: "must",
-			enforcement: "prompt",
 			optimizable: false,
+			omitIfEmpty: false,
 			locales: { "en-US": "Hello [[name]]", "ja-JP": "こんにちは [[name]]" },
 		},
 	],
@@ -57,8 +60,8 @@ const sections: Record<string, S11tnextCompiledSection[]> = {
 			id: "context.text",
 			kind: "instruction",
 			severity: "must",
-			enforcement: "prompt",
 			optimizable: false,
+			omitIfEmpty: false,
 			segments: [
 				{ type: "literal", value: "Hello " },
 				{ type: "variable", name: "name" },
@@ -70,8 +73,8 @@ const sections: Record<string, S11tnextCompiledSection[]> = {
 			id: "context.text",
 			kind: "instruction",
 			severity: "must",
-			enforcement: "prompt",
 			optimizable: false,
+			omitIfEmpty: false,
 			segments: [
 				{ type: "literal", value: "こんにちは " },
 				{ type: "variable", name: "name" },
@@ -143,5 +146,18 @@ describe("hash contract", () => {
 				releaseDigests: { "a.first": "a", "z.last": "b" },
 			}),
 		);
+	});
+
+	it("binds prompt message hashes to both role and text", () => {
+		const value = { role: "user" as const, text: "Review this\nmessage" };
+		const digest = hashPromptMessage(value);
+
+		expect(verifyPromptMessageHash(value, digest)).toBe(true);
+		expect(
+			verifyPromptMessageHash({ role: "system", text: value.text }, digest),
+		).toBe(false);
+		expect(
+			verifyPromptMessageHash({ role: value.role, text: `${value.text}!` }, digest),
+		).toBe(false);
 	});
 });

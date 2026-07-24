@@ -8,10 +8,14 @@ export type CoverageStatus = "direct" | "fallback" | "missing";
 
 export type LocaleCoverageResult = {
 	releaseProfile: string;
+	/** Project default retained for compatibility. Contexts may override it. */
 	sourceLocale: string;
+	sourceLocales: string[];
+	sourceLocalesByContext: Record<string, string>;
 	requestedLocale: string;
 	fallbackLocales: string[];
 	requiredLocales: string[];
+	requiredLocalesByContext: Record<string, string[]>;
 	requiredCoverageSatisfied: boolean;
 	totals: {
 		contexts: number;
@@ -83,9 +87,13 @@ export function inspectCoverage(options: {
 	const resolvedByLocale = Object.fromEntries(
 		fallbackLocales.map((locale) => [locale, [] as string[]]),
 	);
+	const requiredLocalesByContext: Record<string, string[]> = {};
+	const sourceLocalesByContext: Record<string, string> = {};
 	let requiredCoverageSatisfied = true;
 	for (const document of project.documents) {
-		const { key, requiredLocales, sections } = document.definition;
+		const { key, sourceLocale, requiredLocales, sections } = document.definition;
+		sourceLocalesByContext[key] = sourceLocale;
+		requiredLocalesByContext[key] = [...requiredLocales];
 		if (requiredLocales.some((locale) => !hasLocale(sections, locale))) {
 			requiredCoverageSatisfied = false;
 		}
@@ -101,7 +109,14 @@ export function inspectCoverage(options: {
 		fallback.push(key);
 		resolvedByLocale[resolvedFallback]!.push(key);
 	}
-	const requiredLocales = [...(project.documents[0]?.definition.requiredLocales ?? [])];
+	const requiredLocales = [
+		...new Set(
+			project.documents.flatMap(
+				(document) => document.definition.requiredLocales,
+			),
+		),
+	].sort();
+	const sourceLocales = [...new Set(Object.values(sourceLocalesByContext))].sort();
 	direct.sort();
 	fallback.sort();
 	missing.sort();
@@ -109,9 +124,12 @@ export function inspectCoverage(options: {
 	return {
 		releaseProfile: project.releaseProfile,
 		sourceLocale: project.config.authoring.sourceLocale,
+		sourceLocales,
+		sourceLocalesByContext,
 		requestedLocale: options.locale,
 		fallbackLocales,
 		requiredLocales,
+		requiredLocalesByContext,
 		requiredCoverageSatisfied,
 		totals: {
 			contexts: project.documents.length,
@@ -148,6 +166,7 @@ export function inspectContext(
 			key: context.key,
 			owner: context.owner,
 			contentKind: context.contentKind,
+			messageRole: context.messageRole,
 			sourceLocale: context.sourceLocale,
 			requiredLocales: context.requiredLocales,
 			availableLocales: Object.keys(context.locales).sort(),
@@ -173,6 +192,7 @@ export function inspectContext(
 	return {
 		key: context.key,
 		owner: context.owner,
+		messageRole: context.messageRole,
 		locale,
 		definitionHash: context.definitionHash,
 		artifactHash: compiledLocale.artifactHash,

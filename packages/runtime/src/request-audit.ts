@@ -1,3 +1,5 @@
+import { utf8ToBytes } from "@noble/hashes/utils.js";
+
 import { deepFreeze } from "./catalog-shared.js";
 import { invokeContext, validateBinding } from "./catalog-rendering.js";
 import type {
@@ -7,7 +9,7 @@ import type {
 	DefaultContract,
 	RequestRenderTraceEntry,
 	RuntimeValues,
-	SystemContextInvocation,
+	PromptInvocation,
 	TextRenderer,
 	TextRendererObject,
 } from "./catalog-types.js";
@@ -24,7 +26,7 @@ export function createRequestCatalog<C extends DefaultContract>(
 	>;
 	const trace: RequestRenderTraceEntry[] = [];
 	const requestInvocations = new WeakSet<object>();
-	let lastInvocation: SystemContextInvocation | undefined;
+	let lastInvocation: PromptInvocation | undefined;
 	let finalized = false;
 	const assertOpen = (): void => {
 		if (finalized) {
@@ -39,7 +41,7 @@ export function createRequestCatalog<C extends DefaultContract>(
 		via: RequestRenderTraceEntry["via"],
 		key: string,
 		values: RuntimeValues,
-	): SystemContextInvocation => {
+	): PromptInvocation => {
 		assertOpen();
 		const invocation = invokeContext(artifact, key, values, snapshot);
 		requestInvocations.add(invocation);
@@ -73,8 +75,13 @@ export function createRequestCatalog<C extends DefaultContract>(
 		});
 	}
 	const requestInvoke = ((key: string, values: RuntimeValues) =>
-		trackedInvoke("invoke", key, values)) as ReturnType<Catalog<C>["bind"]>;
-	const finalize: BoundRequestCatalog<C>["finalize"] = (finalInvocation) => {
+		trackedInvoke("invoke", key, values)) as unknown as ReturnType<
+		Catalog<C>["bind"]
+	>;
+	const finalize: BoundRequestCatalog<C>["finalize"] = (
+		finalInvocation,
+		includedFragments = [],
+	) => {
 		assertOpen();
 		if (
 			!requestInvocations.has(finalInvocation) ||
@@ -86,11 +93,48 @@ export function createRequestCatalog<C extends DefaultContract>(
 				["finalInvocation"],
 			);
 		}
+		let cursor = 0;
+		const fragments = includedFragments.map((fragment, index) => {
+			if (!requestInvocations.has(fragment) || fragment === finalInvocation) {
+				throw new S11tnextError(
+					"S11TNEXT_VALUE_INVALID",
+					"Composition fragments must be earlier invocations from this request",
+					["includedFragments", index],
+				);
+			}
+			const start = finalInvocation.content.text.indexOf(fragment.content.text, cursor);
+			if (start === -1) {
+				throw new S11tnextError(
+					"S11TNEXT_VALUE_INVALID",
+					"Composition fragment is not included byte-for-byte in the final payload",
+					["includedFragments", index],
+				);
+			}
+			const end = start + fragment.content.text.length;
+			cursor = end;
+			const startByte = utf8ToBytes(
+				finalInvocation.content.text.slice(0, start),
+			).length;
+			const endByte = startByte + utf8ToBytes(fragment.content.text).length;
+			return deepFreeze({
+				manifest: fragment.manifest,
+				startByte,
+				endByte,
+			});
+		});
 		finalized = true;
 		return deepFreeze({
 			binding: snapshot,
 			finalManifest: finalInvocation.manifest,
 			renderTrace: [...trace],
+			...(fragments.length === 0
+				? {}
+				: {
+						composition: deepFreeze({
+							payloadHash: finalInvocation.manifest.renderedHash,
+							fragments,
+						}),
+					}),
 		});
 	};
 	return Object.freeze({

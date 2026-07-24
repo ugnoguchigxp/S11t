@@ -1,5 +1,5 @@
 import type {
-	S11tnextSectionEnforcement,
+	PromptMessageRole,
 	S11tnextSectionKind,
 	S11tnextSectionSeverity,
 	S11tnextVariableEncoding,
@@ -9,7 +9,7 @@ import type {
 } from "./types.js";
 
 export type CanonicalVariableDefinition = {
-	required: true;
+	required: boolean;
 	type: S11tnextVariableType;
 	trust: S11tnextVariableTrust;
 	placement: S11tnextVariablePlacement;
@@ -20,8 +20,8 @@ export type CanonicalSectionDefinition = {
 	id: string;
 	kind: S11tnextSectionKind;
 	severity: S11tnextSectionSeverity;
-	enforcement: S11tnextSectionEnforcement;
 	optimizable: boolean;
+	omitIfEmpty: boolean;
 	locales: Record<string, string>;
 };
 
@@ -29,6 +29,7 @@ export type CanonicalContextDefinition = {
 	key: string;
 	owner: string;
 	contentKind: "text";
+	messageRole: PromptMessageRole;
 	sourceLocale: string;
 	requiredLocales: string[];
 	variables: Record<string, CanonicalVariableDefinition>;

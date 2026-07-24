@@ -16,6 +16,9 @@ const fixtureRoot = fileURLToPath(
 const coverageFixtureRoot = fileURLToPath(
 	new URL("../../../fixtures/valid/locale-rollout/", import.meta.url),
 );
+const mixedSourceFixtureRoot = fileURLToPath(
+	new URL("../../../fixtures/valid/mixed-source/", import.meta.url),
+);
 
 function testConfig() {
 	return parseProjectConfig({
@@ -43,6 +46,7 @@ describe("content-first authoring", () => {
 		expect(project.artifact.contexts["structuredGeneration.repair"]).toMatchObject({
 			key: "structuredGeneration.repair",
 			owner: "structured-generation",
+			messageRole: "system",
 			sourceLocale: "ja-JP",
 			requiredLocales: ["ja-JP", "en-US"],
 			variables: {
@@ -55,6 +59,56 @@ describe("content-first authoring", () => {
 			},
 		});
 	});
+
+	it("defaults message role to system and preserves explicit user roles", () => {
+		const system = parseAndResolveAuthoring(
+			{ text: "System message" },
+			"contexts/example/system.context.toml",
+			"example/system.context.toml",
+			testConfig(),
+			"development",
+		);
+		const user = parseAndResolveAuthoring(
+			{
+				message_role: "user",
+				sections: [
+					{
+						id: "message.input",
+						kind: "runtime-fact",
+						severity: "must",
+						optimizable: false,
+						text: "User message",
+					},
+				],
+			},
+			"contexts/example/input.context.toml",
+			"example/input.context.toml",
+			testConfig(),
+			"development",
+		);
+
+		expect(system.definition.messageRole).toBe("system");
+		expect(system.origins.messageRole).toBe("built-in:system");
+		expect(user.definition.messageRole).toBe("user");
+		expect(user.origins.messageRole).toContain("#message_role");
+	});
+
+	it.each(["assistant", 1, true, [], {}])(
+		"rejects invalid message role %j",
+		(message_role) => {
+			expectDiagnostic(
+				() =>
+					parseAndResolveAuthoring(
+						{ message_role, text: "Invalid role" },
+						"contexts/example/invalid.context.toml",
+						"example/invalid.context.toml",
+						testConfig(),
+						"development",
+					),
+				"S11TNEXT_MESSAGE_ROLE_INVALID",
+			);
+		},
+	);
 
 	it("enforces the delimited placement contract for untrusted variables", () => {
 		const document = parseAndResolveAuthoring(
@@ -80,6 +134,340 @@ describe("content-first authoring", () => {
 		});
 	});
 
+	it("resolves optional variables, section profiles, and keyspace locale policy", () => {
+		const config = parseProjectConfig({
+			source_dir: "contexts",
+			out_dir: "generated",
+			authoring: { source_locale: "ja-JP" },
+			governance: { require_owner: true },
+			keyspaces: { example: { owner: "examples" } },
+			release_profiles: {
+				development: {
+					required_locales: ["$source"],
+					required_locales_by_keyspace: { example: ["$source", "en-US"] },
+				},
+			},
+			variable_profiles: {
+				"trusted.text": {
+					type: "string",
+					trust: "trusted",
+					placement: "inline",
+					encoding: "raw",
+				},
+			},
+			section_profiles: {
+				optional: {
+					kind: "runtime-fact",
+					severity: "may",
+					optimizable: true,
+				},
+			},
+		});
+		const document = parseAndResolveAuthoring(
+			{
+				variables: {
+					detail: { profile: "trusted.text", required: false },
+				},
+				sections: [
+					{
+						id: "optional.detail",
+						profile: "optional",
+						omit_if_empty: true,
+						text: "詳細: [[detail]]",
+						translations: { "en-US": { text: "Detail: [[detail]]" } },
+					},
+				],
+			},
+			"contexts/example/greeting.context.toml",
+			"example/greeting.context.toml",
+			config,
+			"development",
+		);
+
+		expect(document.definition.requiredLocales).toEqual(["ja-JP", "en-US"]);
+		expect(document.definition.variables.detail?.required).toBe(false);
+		expect(document.definition.sections[0]).toMatchObject({
+			kind: "runtime-fact",
+			severity: "may",
+			optimizable: true,
+			omitIfEmpty: true,
+		});
+		expect(document.origins.requiredLocales).toBe(
+			"release_profiles.development.required_locales_by_keyspace.example",
+		);
+	});
+
+	it("resolves source locale from document, keyspace, then project defaults", () => {
+		const config = parseProjectConfig({
+			source_dir: "contexts",
+			out_dir: "generated",
+			authoring: { source_locale: "ja-JP" },
+			governance: { require_owner: true },
+			keyspaces: {
+				example: { owner: "examples", source_locale: "en-US" },
+				"example.french": { owner: "examples", source_locale: "fr-FR" },
+			},
+			release_profiles: { development: { required_locales: ["$source"] } },
+		});
+		const fromKeyspace = parseAndResolveAuthoring(
+			{ text: "Hello" },
+			"contexts/example/greeting.context.toml",
+			"example/greeting.context.toml",
+			config,
+			"development",
+		);
+		const fromLongestKeyspace = parseAndResolveAuthoring(
+			{ text: "Bonjour" },
+			"contexts/example/french/greeting.context.toml",
+			"example/french/greeting.context.toml",
+			config,
+			"development",
+		);
+		const fromDocument = parseAndResolveAuthoring(
+			{ source_locale: "de-DE", text: "Hallo" },
+			"contexts/example/greeting.context.toml",
+			"example/greeting.context.toml",
+			config,
+			"development",
+		);
+
+		expect(fromKeyspace.definition.sourceLocale).toBe("en-US");
+		expect(fromKeyspace.definition.requiredLocales).toEqual(["en-US"]);
+		expect(fromKeyspace.origins.sourceLocale).toBe("keyspaces.example.source_locale");
+		expect(fromLongestKeyspace.definition.sourceLocale).toBe("fr-FR");
+		expect(fromDocument.definition.sourceLocale).toBe("de-DE");
+		expect(fromDocument.origins.sourceLocale).toContain("#source_locale");
+	});
+
+	it.each([
+		{
+			name: "non-boolean optional variable flag",
+			input: {
+				text: "[[value]]",
+				variables: {
+					value: {
+						required: "no",
+						type: "string",
+						trust: "trusted",
+						placement: "inline",
+						encoding: "raw",
+					},
+				},
+			},
+			config: testConfig(),
+			code: "S11TNEXT_SOURCE_INVALID",
+		},
+		{
+			name: "omit_if_empty without a placeholder",
+			input: {
+				sections: [
+					{
+						id: "optional.detail",
+						kind: "runtime-fact",
+						severity: "may",
+						optimizable: true,
+						omit_if_empty: true,
+						text: "No variables",
+					},
+				],
+			},
+			config: testConfig(),
+			code: "S11TNEXT_SOURCE_INVALID",
+		},
+		{
+			name: "section profile combined with inline metadata",
+			input: {
+				sections: [
+					{
+						id: "optional.detail",
+						profile: "optional",
+						kind: "runtime-fact",
+						text: "Detail",
+					},
+				],
+			},
+			config: parseProjectConfig({
+				source_dir: "contexts",
+				out_dir: "generated",
+				authoring: { source_locale: "ja-JP" },
+				governance: { require_owner: true },
+				keyspaces: { example: { owner: "examples" } },
+				release_profiles: { development: { required_locales: ["$source"] } },
+				section_profiles: {
+					optional: {
+						kind: "runtime-fact",
+						severity: "may",
+						optimizable: true,
+					},
+				},
+			}),
+			code: "S11TNEXT_SOURCE_INVALID",
+		},
+		{
+			name: "unknown section profile",
+			input: {
+				sections: [
+					{ id: "optional.detail", profile: "missing", text: "Detail" },
+				],
+			},
+			config: testConfig(),
+			code: "S11TNEXT_SECTION_PROFILE_NOT_FOUND",
+		},
+		{
+			name: "incomplete inline section metadata",
+			input: {
+				sections: [
+					{
+						id: "optional.detail",
+						kind: "runtime-fact",
+						text: "Detail",
+					},
+				],
+			},
+			config: testConfig(),
+			code: "S11TNEXT_SOURCE_INVALID",
+		},
+	])("rejects $name", ({ input, config, code }) => {
+		expectDiagnostic(
+			() =>
+				parseAndResolveAuthoring(
+					input,
+					"contexts/example/greeting.context.toml",
+					"example/greeting.context.toml",
+					config,
+					"development",
+				),
+			code,
+		);
+	});
+
+	it("resolves optional multiline variables and named section profiles", () => {
+		const config = parseProjectConfig({
+			source_dir: "contexts",
+			out_dir: "generated",
+			authoring: { source_locale: "ja-JP" },
+			governance: { require_owner: true },
+			keyspaces: { example: { owner: "examples" } },
+			release_profiles: {
+				development: { required_locales: ["$source"] },
+			},
+			variable_profiles: {
+				"untrusted.multiline": {
+					type: "string",
+					trust: "untrusted",
+					placement: "delimited-context",
+					encoding: "delimited-text",
+				},
+			},
+			section_profiles: {
+				"user.overlay": {
+					kind: "overlay",
+					severity: "may",
+					optimizable: false,
+				},
+			},
+		});
+		const document = parseAndResolveAuthoring(
+			{
+				variables: {
+					userContext: {
+						profile: "untrusted.multiline",
+						required: false,
+					},
+				},
+				sections: [
+					{
+						id: "user.context",
+						profile: "user.overlay",
+						omit_if_empty: true,
+						text: "<USER_SYSTEM_CONTEXT>\n[[userContext]]\n</USER_SYSTEM_CONTEXT>",
+					},
+				],
+			},
+			"contexts/example/overlay.context.toml",
+			"example/overlay.context.toml",
+			config,
+			"development",
+		);
+
+		expect(document.definition.variables.userContext).toMatchObject({
+			required: false,
+			encoding: "delimited-text",
+		});
+		expect(document.definition.sections[0]).toMatchObject({
+			kind: "overlay",
+			severity: "may",
+			optimizable: false,
+			omitIfEmpty: true,
+		});
+	});
+
+	it("applies locale requirements to the longest matching keyspace", () => {
+		const config = parseProjectConfig({
+			source_dir: "contexts",
+			out_dir: "generated",
+			authoring: { source_locale: "ja-JP" },
+			governance: { require_owner: true },
+			keyspaces: {
+				chat: { owner: "chat" },
+				review: { owner: "review" },
+			},
+			release_profiles: {
+				production: {
+					required_locales: ["$source"],
+					required_locales_by_keyspace: {
+						chat: ["$source", "en-US"],
+						"chat.internal": ["$source"],
+						review: ["$source"],
+					},
+				},
+			},
+		});
+
+		expectDiagnostic(
+			() =>
+				parseAndResolveAuthoring(
+					{ text: "チャット" },
+					"contexts/chat/system.context.toml",
+					"chat/system.context.toml",
+					config,
+					"production",
+				),
+			"S11TNEXT_TRANSLATION_MISSING",
+		);
+		const chat = parseAndResolveAuthoring(
+			{
+				text: "チャット",
+				translations: { "en-US": { text: "Chat" } },
+			},
+			"contexts/chat/system.context.toml",
+			"chat/system.context.toml",
+			config,
+			"production",
+		);
+		const review = parseAndResolveAuthoring(
+			{ text: "レビュー" },
+			"contexts/review/system.context.toml",
+			"review/system.context.toml",
+			config,
+			"production",
+		);
+		const internalChat = parseAndResolveAuthoring(
+			{ text: "内部チャット" },
+			"contexts/chat/internal/system.context.toml",
+			"chat/internal/system.context.toml",
+			config,
+			"production",
+		);
+
+		expect(chat.definition.requiredLocales).toEqual(["ja-JP", "en-US"]);
+		expect(review.definition.requiredLocales).toEqual(["ja-JP"]);
+		expect(internalChat.definition.requiredLocales).toEqual(["ja-JP"]);
+		expect(chat.origins.requiredLocales).toBe(
+			"release_profiles.production.required_locales_by_keyspace.chat",
+		);
+	});
+
 	it("reports resolved values and their top-level origins", () => {
 		const result = inspectContext("structuredGeneration.repair", {
 			cwd: fixtureRoot,
@@ -88,11 +476,13 @@ describe("content-first authoring", () => {
 		}) as Record<string, unknown>;
 		expect(result).toMatchObject({
 			key: "structuredGeneration.repair",
+			messageRole: "system",
 			sourceLocale: "ja-JP",
 			releaseProfile: "production",
 			origins: {
+				messageRole: "built-in:system",
 				sourceLocale: "authoring.source_locale",
-				requiredLocales: "release_profiles.production",
+				requiredLocales: "release_profiles.production.required_locales",
 			},
 		});
 	});
@@ -141,9 +531,20 @@ describe("content-first authoring", () => {
 		).toEqual({
 			releaseProfile: "development",
 			sourceLocale: "ja-JP",
+			sourceLocales: ["ja-JP"],
+			sourceLocalesByContext: {
+				"rollout.direct": "ja-JP",
+				"rollout.fallback": "ja-JP",
+				"rollout.missing": "ja-JP",
+			},
 			requestedLocale: "en-US",
 			fallbackLocales: ["fr-FR"],
 			requiredLocales: ["ja-JP"],
+			requiredLocalesByContext: {
+				"rollout.direct": ["ja-JP"],
+				"rollout.fallback": ["ja-JP"],
+				"rollout.missing": ["ja-JP"],
+			},
 			requiredCoverageSatisfied: true,
 			totals: { contexts: 3, direct: 1, fallback: 1, missing: 1 },
 			direct: { keys: ["rollout.direct"] },
@@ -162,6 +563,40 @@ describe("content-first authoring", () => {
 				fallbackLocales: ["ja-JP"],
 			}).requiredCoverageSatisfied,
 		).toBe(false);
+	});
+
+	it("reports effective source locales for mixed-locale catalogs", () => {
+		expect(
+			inspectCoverage({
+				cwd: mixedSourceFixtureRoot,
+				releaseProfile: "development",
+				locale: "en-US",
+				fallbackLocales: ["fr-FR"],
+			}),
+		).toEqual({
+			releaseProfile: "development",
+			sourceLocale: "ja-JP",
+			sourceLocales: ["en-US", "fr-FR"],
+			sourceLocalesByContext: {
+				"english.greeting": "en-US",
+				"french.greeting": "fr-FR",
+			},
+			requestedLocale: "en-US",
+			fallbackLocales: ["fr-FR"],
+			requiredLocales: ["en-US", "fr-FR"],
+			requiredLocalesByContext: {
+				"english.greeting": ["en-US"],
+				"french.greeting": ["fr-FR"],
+			},
+			requiredCoverageSatisfied: true,
+			totals: { contexts: 2, direct: 1, fallback: 1, missing: 0 },
+			direct: { keys: ["english.greeting"] },
+			fallback: {
+				keys: ["french.greeting"],
+				resolvedByLocale: { "fr-FR": ["french.greeting"] },
+			},
+			missing: { keys: [] },
+		});
 	});
 
 	it("validates coverage locale bindings like the runtime", () => {
@@ -198,6 +633,34 @@ describe("content-first authoring", () => {
 					release_profiles: {
 						development: { required_locales: ["$source", "ja-JP"] },
 					},
+				}),
+			"S11TNEXT_CONFIG_INVALID",
+		);
+	});
+
+	it("parses generated TypeScript indentation", () => {
+		const spaces = parseProjectConfig({
+			source_dir: "contexts",
+			out_dir: "generated",
+			authoring: { source_locale: "ja-JP" },
+			governance: { require_owner: true },
+			keyspaces: { example: { owner: "examples" } },
+			release_profiles: { development: { required_locales: ["$source"] } },
+			generation: { typescript_indent: 2 },
+		});
+		expect(spaces.generation.typeScriptIndent).toBe("  ");
+		expectDiagnostic(
+			() =>
+				parseProjectConfig({
+					source_dir: "contexts",
+					out_dir: "generated",
+					authoring: { source_locale: "ja-JP" },
+					governance: { require_owner: true },
+					keyspaces: { example: { owner: "examples" } },
+					release_profiles: {
+						development: { required_locales: ["$source"] },
+					},
+					generation: { typescript_indent: 0 },
 				}),
 			"S11TNEXT_CONFIG_INVALID",
 		);
@@ -280,7 +743,6 @@ describe("content-first authoring", () => {
 						id: "context.text",
 						kind: "instruction",
 						severity: "must",
-						enforcement: "prompt",
 						optimizable: false,
 						text: "こんにちは [[name]]",
 						translations: { "en-US": { text: "Hello [[name]] [[detail]]" } },
@@ -391,7 +853,6 @@ describe("content-first authoring", () => {
 						id: "context.text",
 						kind: "instruction",
 						severity: "must",
-						enforcement: "prompt",
 						optimizable: false,
 						text: "正本",
 					},

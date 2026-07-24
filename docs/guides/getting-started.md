@@ -44,7 +44,10 @@ required_locales = ["$source", "en-US"]
 type = "string"
 trust = "untrusted"
 placement = "delimited-context"
-encoding = "json-string"
+encoding = "delimited-text"
+
+[generation]
+typescript_indent = 2
 ```
 
 Create `contexts/codingAgent/task.context.toml`:
@@ -64,6 +67,11 @@ text = '''Handle the following user request.
 The path produces the canonical key `codingAgent.task`. Untrusted values must use
 `delimited-context` placement and a non-raw encoding.
 
+Use root `source_locale` in a context document, or `source_locale` under a keyspace, when authored
+documents do not share the project default locale. Optional variables use `required = false`.
+For optional prompt fragments, set `omit_if_empty = true` on a section containing the optional
+placeholder.
+
 ## Validate and build
 
 ```sh
@@ -75,6 +83,20 @@ npm run s11tnext:check
 The build writes `.s11tnext/catalog.json` and `.s11tnext/catalog.generated.ts`. Both files are staged before
 installation and the previous pair is restored if installation fails. Commit them together.
 `--check` performs no writes and reports `S11TNEXT_BUILD_STALE` when either output differs.
+
+When the consuming TypeScript project enables `composite`, every implementation file must be matched by
+`include` or listed in `files`. Include the generated factory explicitly:
+
+```json
+{
+  "compilerOptions": { "composite": true },
+  "include": ["src/**/*.ts", ".s11tnext/catalog.generated.ts"]
+}
+```
+
+S11tnext's supported runtime and CLI environments are the Node.js versions declared by each package's
+`engines.node`. Bun may work for installation and application scripts, but it is currently a dogfooding
+environment rather than a supported compatibility target.
 
 ## Bind one request
 
@@ -93,7 +115,9 @@ const final = requestCatalog.invoke("codingAgent.task", {
   taskGoal: request.userMessage,
 });
 const audit = requestCatalog.finalize(final);
-await provider.generate({ system: final.content.text });
+await provider.generate({
+  messages: [{ role: final.role, content: final.content.text }],
+});
 await auditStore.write(audit);
 ```
 

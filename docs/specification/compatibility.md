@@ -1,7 +1,7 @@
 # Public API and compatibility policy
 
-This policy applies from the first `0.1.0` release. Until that release, `0.0.0` and artifacts generated
-from the repository are development contracts and may change without compatibility guarantees.
+This policy applies from the first `0.1.0` release. Both packages are published and remain in `0.x`
+pre-release development.
 
 ## Versioned surfaces
 
@@ -45,6 +45,10 @@ Before 1.0:
   syntax;
 - every public change requires a Changeset, tests, and an updated specification or migration note.
 
+The `0.1.2` release is a documented one-time exception to the patch rule above: it replaces the
+unversioned `0.1.0` artifact with artifact version 2 and requires regeneration. Version `0.1.1` is
+intentionally skipped and is not published. Patch compatibility resumes from the `0.1.2` contract.
+
 From 1.0 onward, normal Semantic Versioning applies: backward-compatible additions use minor releases,
 compatible fixes use patch releases, and breaking changes use major releases.
 
@@ -76,3 +80,7 @@ replacement or mitigation when one exists.
 Do not hand-edit generated artifacts or carry an old generated TypeScript file beside a newly generated
 catalog. If a release changes an authoring or artifact contract, its migration note must describe the
 required source edits and regeneration command.
+
+Artifact version 2 is introduced by `0.1.2` and is intentionally incompatible with unversioned
+`0.1.0` artifacts. Upgrade Runtime and CLI together, then rebuild both generated outputs.
+See [Migrating to 0.1.2](../guides/migrating-to-0.1.2.md).

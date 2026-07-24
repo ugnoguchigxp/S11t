@@ -29,11 +29,14 @@ const hostileUnicode = fc
 	)
 	.map((chunks) => chunks.join(""));
 
-function untrustedCatalog() {
+function untrustedCatalog(
+	encoding: "delimited-text" | "json-string" = "json-string",
+) {
 	const definition: CanonicalContextDefinition = {
 		key: "property.untrusted",
 		owner: "test",
 		contentKind: "text",
+		messageRole: "system",
 		sourceLocale: "en-US",
 		requiredLocales: ["en-US"],
 		variables: {
@@ -42,7 +45,7 @@ function untrustedCatalog() {
 				type: "string",
 				trust: "untrusted",
 				placement: "delimited-context",
-				encoding: "json-string",
+				encoding,
 			},
 		},
 		sections: [
@@ -50,8 +53,8 @@ function untrustedCatalog() {
 				id: "context.text",
 				kind: "instruction",
 				severity: "must",
-				enforcement: "prompt",
 				optimizable: false,
+				omitIfEmpty: false,
 				locales: { "en-US": "[[value]]" },
 			},
 		],
@@ -72,6 +75,7 @@ function untrustedJsonCatalog() {
 		key: "property.json",
 		owner: "test",
 		contentKind: "text",
+		messageRole: "system",
 		sourceLocale: "en-US",
 		requiredLocales: ["en-US"],
 		variables: {
@@ -88,8 +92,8 @@ function untrustedJsonCatalog() {
 				id: "context.text",
 				kind: "instruction",
 				severity: "must",
-				enforcement: "prompt",
 				optimizable: false,
+				omitIfEmpty: false,
 				locales: { "en-US": "[[value]]" },
 			},
 		],
@@ -142,6 +146,26 @@ describe("runtime properties", () => {
 				const bodyEnd = text.lastIndexOf("\n</S11TNEXT_DELIMITED_CONTEXT>");
 				const encodedBody = text.slice(bodyStart, bodyEnd);
 				expect(encodedBody).not.toMatch(/[<>&\u2028\u2029]/);
+			}),
+			{ numRuns: 250 },
+		);
+	});
+
+	it("preserves multiline text exactly except for boundary-character escaping", () => {
+		const render = untrustedCatalog("delimited-text");
+		fc.assert(
+			fc.property(hostileUnicode, (value) => {
+				const text = render("property.untrusted", { value }).content.text;
+				const bodyStart = text.indexOf("\n") + 1;
+				const bodyEnd = text.lastIndexOf("\n</S11TNEXT_DELIMITED_CONTEXT>");
+				const encodedBody = text.slice(bodyStart, bodyEnd);
+				const expected = value.replace(/[<>&\u2028\u2029]/g, (character) => {
+					const code = character.codePointAt(0)!;
+					return `\\u${code.toString(16).padStart(4, "0")}`;
+				});
+
+				expect(encodedBody).toBe(expected);
+				expect(text.match(/<\/S11TNEXT_DELIMITED_CONTEXT>/g)).toHaveLength(1);
 			}),
 			{ numRuns: 250 },
 		);

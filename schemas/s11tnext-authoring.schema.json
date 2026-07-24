@@ -6,6 +6,11 @@
   "additionalProperties": false,
   "properties": {
     "content_kind": { "const": "text" },
+    "message_role": { "enum": ["system", "user"] },
+    "source_locale": {
+      "type": "string",
+      "pattern": "^[A-Za-z]{2,8}(?:-[A-Za-z0-9]{1,8})*$"
+    },
     "text": { "type": "string", "minLength": 1 },
     "translations": { "$ref": "#/$defs/translations" },
     "variables": {
@@ -47,17 +52,21 @@
           "type": "object",
           "additionalProperties": false,
           "required": ["profile"],
-          "properties": { "profile": { "type": "string", "minLength": 1 } }
+          "properties": {
+            "profile": { "type": "string", "minLength": 1 },
+            "required": { "type": "boolean" }
+          }
         },
         {
           "type": "object",
           "additionalProperties": false,
           "required": ["type", "trust", "placement", "encoding"],
           "properties": {
+            "required": { "type": "boolean" },
             "type": { "enum": ["string", "number", "boolean", "json"] },
             "trust": { "enum": ["trusted", "untrusted"] },
             "placement": { "enum": ["inline", "delimited-context"] },
-            "encoding": { "enum": ["raw", "json-string", "json-value"] }
+            "encoding": { "enum": ["raw", "delimited-text", "json-string", "json-value"] }
           },
           "allOf": [
             {
@@ -78,6 +87,16 @@
               "then": { "properties": { "type": { "enum": ["string", "number", "boolean"] } }, "required": ["type"] }
             },
             {
+              "if": { "properties": { "encoding": { "const": "delimited-text" } }, "required": ["encoding"] },
+              "then": {
+                "properties": {
+                  "type": { "const": "string" },
+                  "placement": { "const": "delimited-context" }
+                },
+                "required": ["type", "placement"]
+              }
+            },
+            {
               "if": { "properties": { "trust": { "const": "untrusted" } }, "required": ["trust"] },
               "then": { "properties": { "placement": { "const": "delimited-context" } }, "required": ["placement"] }
             }
@@ -88,16 +107,37 @@
     "section": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["id", "kind", "severity", "enforcement", "optimizable", "text"],
+      "required": ["id", "text"],
       "properties": {
         "id": { "type": "string", "minLength": 1 },
+        "profile": { "type": "string", "minLength": 1 },
         "kind": { "enum": ["instruction", "runtime-fact", "tool-contract", "output-contract", "overlay"] },
         "severity": { "enum": ["must", "should", "may"] },
-        "enforcement": { "enum": ["prompt", "schema", "host"] },
         "optimizable": { "type": "boolean" },
+        "omit_if_empty": { "type": "boolean" },
         "text": { "type": "string", "minLength": 1 },
         "translations": { "$ref": "#/$defs/translations" }
-      }
+      },
+      "oneOf": [
+        {
+          "required": ["profile"],
+          "properties": {
+            "profile": {},
+            "kind": false,
+            "severity": false,
+            "optimizable": false
+          }
+        },
+        {
+          "required": ["kind", "severity", "optimizable"],
+          "properties": {
+            "profile": false,
+            "kind": {},
+            "severity": {},
+            "optimizable": {}
+          }
+        }
+      ]
     }
   }
 }

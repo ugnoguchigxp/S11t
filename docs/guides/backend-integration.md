@@ -10,12 +10,17 @@ Bind locale per request:
 const p = catalog.bind({
   instructionLocale: request.locale,
   fallbackLocales: ["en-US"],
+  trailingNewline: false,
 });
 ```
 
-`p()` is synchronous. It validates missing, extra, and invalid runtime values; renders sections in source order; and returns immutable content plus a manifest. Runtime values and rendered text are not copied into the manifest.
+`p()` is synchronous. It validates missing, extra, and invalid runtime values; renders sections in source
+order; and returns the authored provider-message role, immutable content, and a manifest. Runtime values
+and rendered text are not copied into the manifest.
 
-S11tnext does not call an LLM provider and does not own authorization, retries, tool enforcement, or trace persistence. Pass `invocation.content.text` and the immutable manifest to those application-owned layers.
+S11tnext does not call an LLM provider and does not own authorization, retries, tool enforcement, or
+trace persistence. Submit `{ role: invocation.role, content: invocation.content.text }` and pass the
+immutable manifest to those application-owned layers.
 
 For text-only composition with one locale snapshot, bind once at the start of the request or run:
 
@@ -46,3 +51,19 @@ multiple calls, because settings could change between them; create one `bindText
 
 `bindText()` and `createTextRenderer()` discard the invocation manifest. Provider submission, audit, hash
 recording, and locale diagnostics must use `bind()` so the manifest remains attached to the rendered text.
+
+For audited composition, render fragments with one `bindRequest()` and pass the fragments explicitly
+when finalizing:
+
+```ts
+const requestCatalog = catalog.bindRequest(request.languageBinding);
+const policy = requestCatalog.invoke("reviewer.policy", {});
+const final = requestCatalog.invoke("reviewer.evaluate", {
+  policy: policy.content.text,
+  evidencePack: request.evidencePack,
+});
+const audit = requestCatalog.finalize(final, [policy]);
+```
+
+`audit.composition` binds the final rendered hash to each fragment's manifest and byte range. This proves
+library-side composition, not delivery to or acceptance by an external provider.

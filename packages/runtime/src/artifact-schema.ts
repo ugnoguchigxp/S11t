@@ -1,5 +1,6 @@
 import { S11tnextError } from "./diagnostics.js";
 import type { S11tnextCatalogArtifact } from "./types.js";
+import { ARTIFACT_VERSION } from "./version.js";
 
 type Path = Array<string | number>;
 type UnknownRecord = Record<string, unknown>;
@@ -122,11 +123,15 @@ function nonEmptyUniqueStringArray(value: unknown, path: Path): string[] {
 function validateVariable(value: unknown, path: Path): void {
 	const object = record(value, path);
 	exactKeys(object, ["required", "type", "trust", "placement", "encoding"], path);
-	literal(object.required, true, [...path, "required"]);
+	if (typeof object.required !== "boolean") fail([...path, "required"], "a boolean");
 	oneOf(object.type, ["string", "number", "boolean", "json"], [...path, "type"]);
 	oneOf(object.trust, ["trusted", "untrusted"], [...path, "trust"]);
 	oneOf(object.placement, ["inline", "delimited-context"], [...path, "placement"]);
-	oneOf(object.encoding, ["raw", "json-string", "json-value"], [...path, "encoding"]);
+	oneOf(
+		object.encoding,
+		["raw", "delimited-text", "json-string", "json-value"],
+		[...path, "encoding"],
+	);
 	if (object.trust === "untrusted" && object.encoding === "raw") {
 		fail([...path, "encoding"], "a non-raw encoding for untrusted data");
 	}
@@ -137,7 +142,16 @@ function validateVariable(value: unknown, path: Path): void {
 		fail([...path, "encoding"], "raw encoding with a string variable");
 	}
 	if (object.encoding === "json-string" && object.type === "json") {
-		fail([...path, "encoding"], "json-string encoding with a scalar variable");
+		fail([...path, "encoding"], "json-string encoding with a non-json variable");
+	}
+	if (
+		object.encoding === "delimited-text" &&
+		(object.type !== "string" || object.placement !== "delimited-context")
+	) {
+		fail(
+			[...path, "encoding"],
+			"delimited-text encoding with a string variable using delimited-context placement",
+		);
 	}
 }
 
@@ -160,7 +174,7 @@ function validateSection(value: unknown, path: Path, validateVariableNames = fal
 	const object = record(value, path);
 	exactKeys(
 		object,
-		["id", "kind", "severity", "enforcement", "optimizable", "segments"],
+		["id", "kind", "severity", "optimizable", "omitIfEmpty", "segments"],
 		path,
 	);
 	nonEmptyString(object.id, [...path, "id"]);
@@ -170,8 +184,8 @@ function validateSection(value: unknown, path: Path, validateVariableNames = fal
 		[...path, "kind"],
 	);
 	oneOf(object.severity, ["must", "should", "may"], [...path, "severity"]);
-	oneOf(object.enforcement, ["prompt", "schema", "host"], [...path, "enforcement"]);
 	if (typeof object.optimizable !== "boolean") fail([...path, "optimizable"], "a boolean");
+	if (typeof object.omitIfEmpty !== "boolean") fail([...path, "omitIfEmpty"], "a boolean");
 	array(object.segments, [...path, "segments"]).forEach((segment, index) =>
 		validateSegment(segment, [...path, "segments", index], validateVariableNames),
 	);
@@ -198,6 +212,7 @@ function validateContext(value: unknown, path: Path): void {
 			"key",
 			"owner",
 			"contentKind",
+			"messageRole",
 			"sourceLocale",
 			"requiredLocales",
 			"variables",
@@ -211,6 +226,7 @@ function validateContext(value: unknown, path: Path): void {
 	if (!DOT_KEY_PATTERN.test(key)) fail([...path, "key"], "a dot context key");
 	nonEmptyString(object.owner, [...path, "owner"]);
 	literal(object.contentKind, "text", [...path, "contentKind"]);
+	oneOf(object.messageRole, ["system", "user"], [...path, "messageRole"]);
 	const sourceLocale = nonEmptyString(object.sourceLocale, [...path, "sourceLocale"]);
 	if (!LOCALE_PATTERN.test(sourceLocale)) fail([...path, "sourceLocale"], "a locale identifier");
 	const requiredLocales = nonEmptyUniqueStringArray(
@@ -241,10 +257,18 @@ function validateContext(value: unknown, path: Path): void {
 
 export function assertCatalogArtifact(value: unknown): asserts value is S11tnextCatalogArtifact {
 	const object = record(value, []);
+	if (object.artifactVersion !== ARTIFACT_VERSION) {
+		throw new S11tnextError(
+			"S11TNEXT_ARTIFACT_VERSION_UNSUPPORTED",
+			`Unsupported artifact version; rebuild with s11tnext-cli compatible with artifact version ${ARTIFACT_VERSION}`,
+			["artifactVersion"],
+		);
+	}
 	exactKeys(
 		object,
 		[
 			"format",
+			"artifactVersion",
 			"compilerVersion",
 			"releaseProfile",
 			"policyDigest",
@@ -255,6 +279,7 @@ export function assertCatalogArtifact(value: unknown): asserts value is S11tnext
 		[],
 	);
 	literal(object.format, "s11tnext.catalog", ["format"]);
+	literal(object.artifactVersion, ARTIFACT_VERSION, ["artifactVersion"]);
 	nonEmptyString(object.compilerVersion, ["compilerVersion"]);
 	nonEmptyString(object.releaseProfile, ["releaseProfile"]);
 	digest(object.policyDigest, ["policyDigest"]);

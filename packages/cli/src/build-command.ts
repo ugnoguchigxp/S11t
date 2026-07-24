@@ -41,7 +41,9 @@ export function buildProject(
 	const catalogBytes = `${JSON.stringify(project.artifact, null, 2)}\n`;
 	const parsedArtifact: unknown = JSON.parse(catalogBytes);
 	assertCatalogArtifact(parsedArtifact);
-	const typeBytes = emitTypes(project.artifact);
+	const typeBytes = emitTypes(project.artifact, {
+		indent: project.config.generation.typeScriptIndent,
+	});
 	const outputDirectory = resolve(project.configDirectory, project.config.outDir);
 	const catalogPath = resolve(outputDirectory, "catalog.json");
 	const typesPath = resolve(outputDirectory, "catalog.generated.ts");

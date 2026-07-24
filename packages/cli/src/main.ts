@@ -6,7 +6,7 @@ import { S11tnextDiagnosticError, type S11tnextDiagnostic } from "./diagnostics.
 import { inspectContext, inspectCoverage } from "./inspect-command.js";
 import { lintProject } from "./lint-command.js";
 
-export const HELP = `s11tnext - SystemContext authoring and build tools
+export const HELP = `s11tnext - LLM prompt-message authoring and build tools
 
 Usage:
   s11tnext lint --release-profile name [--config s11tnext.config.toml] [--format human|json]

@@ -45,6 +45,28 @@ describe("build command", () => {
 		expect(firstTypes).toContain('"outputRequirements": string;');
 	});
 
+	it("applies configured TypeScript indentation through the build command", () => {
+		const directory = temporaryFixture();
+		const configPath = join(directory, "s11tnext.config.toml");
+		writeFileSync(
+			configPath,
+			`${readFileSync(configPath, "utf8")}\n[generation]\ntypescript_indent = 2\n`,
+		);
+
+		const result = buildProject({ cwd: directory, releaseProfile: "production" });
+		const generated = readFileSync(result.typesPath, "utf8");
+		expect(generated).toContain('\n    "outputRequirements": string;');
+		expect(generated).toContain("\n  PromptKey,");
+		expect(generated).not.toContain("\t");
+		expect(
+			buildProject({
+				cwd: directory,
+				releaseProfile: "production",
+				check: true,
+			}).checked,
+		).toBe(true);
+	});
+
 	it("detects stale output without rewriting it", () => {
 		const directory = temporaryFixture();
 		const result = buildProject({ cwd: directory, releaseProfile: "production" });

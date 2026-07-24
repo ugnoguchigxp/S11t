@@ -56,7 +56,9 @@ describe("CLI", () => {
 		});
 		expect(execute(["-V"], directory).stdout).toBe(expectedVersionOutput);
 		expect(execute(["version", "extra"], directory).code).toBe(2);
-		expect(execute(["help"], directory).stdout).toContain("SystemContext authoring");
+		expect(execute(["help"], directory).stdout).toContain(
+			"LLM prompt-message authoring",
+		);
 		expect(execute(["help", "unknown"], directory).code).toBe(2);
 		expect(execute(["help", "build", "extra"], directory).code).toBe(2);
 		expect(execute(["unknown", "--help"], directory).code).toBe(2);
@@ -140,7 +142,9 @@ describe("CLI", () => {
 		expect(human).toMatchObject({ code: 0, stderr: "" });
 		expect(human.stdout).toContain("key: structuredGeneration.repair\n");
 		expect(human.stdout).toContain("origins:\n");
-		expect(human.stdout).toContain("\trequiredLocales: release_profiles.production\n");
+		expect(human.stdout).toContain(
+			"\trequiredLocales: release_profiles.production.required_locales\n",
+		);
 
 		const json = execute([...base, "--format", "json"], directory);
 		expect(json).toMatchObject({ code: 0, stderr: "" });
@@ -149,7 +153,7 @@ describe("CLI", () => {
 				key: "structuredGeneration.repair",
 				releaseProfile: "production",
 				origins: expect.objectContaining({
-					requiredLocales: "release_profiles.production",
+					requiredLocales: "release_profiles.production.required_locales",
 				}),
 			}),
 		);

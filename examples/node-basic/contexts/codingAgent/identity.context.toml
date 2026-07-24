@@ -2,13 +2,12 @@
 type = "string"
 trust = "untrusted"
 placement = "delimited-context"
-encoding = "json-string"
+encoding = "delimited-text"
 
 [[sections]]
 id = "role.identity"
 kind = "instruction"
 severity = "must"
-enforcement = "prompt"
 optimizable = false
 text = "あなたはユーザーTaskを自動化するCoding Agentです。"
 
@@ -19,17 +18,16 @@ text = "You are a Coding Agent that automates user tasks."
 id = "task.goal-context"
 kind = "runtime-fact"
 severity = "should"
-enforcement = "prompt"
 optimizable = false
 text = '''
-<TASK_GOAL_JSON_STRING>
+<TASK_GOAL_TEXT>
 [[taskGoal]]
-</TASK_GOAL_JSON_STRING>
+</TASK_GOAL_TEXT>
 '''
 
 [sections.translations."en-US"]
 text = '''
-<TASK_GOAL_JSON_STRING>
+<TASK_GOAL_TEXT>
 [[taskGoal]]
-</TASK_GOAL_JSON_STRING>
+</TASK_GOAL_TEXT>
 '''

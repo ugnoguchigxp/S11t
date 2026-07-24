@@ -5,6 +5,7 @@ import type { CanonicalContextDefinition } from "./canonical-definition.js";
 import { canonicalJson } from "./canonical-json.js";
 import type {
 	JsonValue,
+	PromptMessageRole,
 	S11tnextCompiledSection,
 } from "./types.js";
 
@@ -15,6 +16,7 @@ const HASH_DOMAINS = {
 	policy: "s11tnext.policy",
 	catalog: "s11tnext.catalog",
 	rendered: "s11tnext.rendered",
+	promptMessage: "s11tnext.prompt-message",
 } as const;
 
 export type S11tnextDigest = `sha256:${string}`;
@@ -38,6 +40,7 @@ export function hashDefinition(
 		key: value.key,
 		owner: value.owner,
 		contentKind: value.contentKind,
+		messageRole: value.messageRole,
 		sourceLocale: value.sourceLocale,
 		requiredLocales: [...value.requiredLocales],
 		variables: value.variables,
@@ -101,4 +104,18 @@ export function hashRendered(text: string): S11tnextDigest {
 
 export function verifyRenderedHash(text: string, digest: string): boolean {
 	return hashRendered(text) === digest;
+}
+
+export function hashPromptMessage(value: {
+	role: PromptMessageRole;
+	text: string;
+}): S11tnextDigest {
+	return hashCanonical(HASH_DOMAINS.promptMessage, value);
+}
+
+export function verifyPromptMessageHash(
+	value: { role: PromptMessageRole; text: string },
+	digest: string,
+): boolean {
+	return hashPromptMessage(value) === digest;
 }

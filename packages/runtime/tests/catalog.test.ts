@@ -2,8 +2,10 @@ import { describe, expect, it } from "vitest";
 
 import {
 	createCatalog,
+	hashPromptMessage,
 	hashRendered,
 	S11tnextError,
+	verifyPromptMessageHash,
 	verifyRenderedHash,
 } from "../src/index.js";
 import { compileCatalog, type CanonicalContextDefinition } from "../src/compiler.js";
@@ -13,6 +15,7 @@ function definition(): CanonicalContextDefinition {
 		key: "codingAgent.role-instructions",
 		owner: "coding-agent",
 		contentKind: "text",
+		messageRole: "system",
 		sourceLocale: "ja-JP",
 		requiredLocales: ["ja-JP", "en-US"],
 		variables: {},
@@ -21,8 +24,8 @@ function definition(): CanonicalContextDefinition {
 				id: "context.text",
 				kind: "instruction",
 				severity: "must",
-				enforcement: "prompt",
 				optimizable: false,
+				omitIfEmpty: false,
 				locales: { "ja-JP": "日本語", "en-US": "English" },
 			},
 		],
@@ -108,11 +111,74 @@ describe("catalog", () => {
 			{},
 		);
 		expect(invocation.content.text).toBe("日本語\n");
+		expect(invocation.role).toBe("system");
 		expect(invocation.manifest).toEqual(
 			expect.objectContaining({
 				key: "codingAgent.role-instructions",
+				messageRole: "system",
+				messageHash: hashPromptMessage({
+					role: "system",
+					text: invocation.content.text,
+				}),
 			}),
 		);
+		expect(
+			verifyPromptMessageHash(
+				{ role: invocation.role, text: invocation.content.text },
+				invocation.manifest.messageHash,
+			),
+		).toBe(true);
+	});
+
+	it("returns literal runtime roles for user contexts", () => {
+		const input = definition();
+		input.messageRole = "user";
+		const invocation = createCatalog(
+			compileCatalog([input], {
+				releaseProfile: "production",
+				provenance: {
+					configPath: "s11tnext.config.toml",
+					sourceFiles: ["contexts/input.context.toml"],
+				},
+			}),
+		).bind({ instructionLocale: "ja-JP" })(
+			"codingAgent.role-instructions",
+			{},
+		);
+
+		expect(invocation.role).toBe("user");
+		expect(invocation.manifest.messageRole).toBe("user");
+		expect(
+			verifyPromptMessageHash(
+				{ role: "system", text: invocation.content.text },
+				invocation.manifest.messageHash,
+			),
+		).toBe(false);
+	});
+
+	it("allows the terminal newline to be disabled per binding", () => {
+		const catalog = createCatalog(artifact());
+		const withoutNewline = catalog.bind({
+			instructionLocale: "ja-JP",
+			trailingNewline: false,
+		})("codingAgent.role-instructions", {});
+		const withDefault = catalog.bind({ instructionLocale: "ja-JP" })(
+			"codingAgent.role-instructions",
+			{},
+		);
+
+		expect(withoutNewline.content.text).toBe("日本語");
+		expect(withoutNewline.manifest.trailingNewline).toBe(false);
+		expect(withDefault.content.text).toBe("日本語\n");
+		expect(withDefault.manifest.trailingNewline).toBe(true);
+		expect(
+			errorCode(() =>
+				catalog.bind({
+					instructionLocale: "ja-JP",
+					trailingNewline: "no",
+				} as never),
+			),
+		).toBe("S11TNEXT_VALUE_INVALID");
 	});
 
 	it("rejects placeholder mismatches in canonical definitions", () => {
@@ -215,6 +281,14 @@ describe("catalog", () => {
 		expect(errorCode(() => createCatalog(input))).toBe("S11TNEXT_ARTIFACT_INVALID");
 	});
 
+	it("rejects message role tampering through digest validation", () => {
+		const input = artifact();
+		input.contexts["codingAgent.role-instructions"]!.messageRole = "user";
+		expect(errorCode(() => createCatalog(input))).toBe(
+			"S11TNEXT_ARTIFACT_DIGEST_MISMATCH",
+		);
+	});
+
 	it("rejects placeholder mismatches in compiled artifacts before digest validation", () => {
 		const input = compileCatalog([definitionWithValue()], {
 			releaseProfile: "production",
@@ -230,6 +304,20 @@ describe("catalog", () => {
 			expect.objectContaining<S11tnextError>({
 				code: "S11TNEXT_ARTIFACT_INVALID",
 				message: "Translation placeholders must match the source locale",
+			}),
+		);
+	});
+
+	it("rejects omitIfEmpty sections without variable segments before digest validation", () => {
+		const input = artifact();
+		input.contexts["codingAgent.role-instructions"]!.locales[
+			"ja-JP"
+		]!.sections[0]!.omitIfEmpty = true;
+
+		expect(() => createCatalog(input)).toThrowError(
+			expect.objectContaining<S11tnextError>({
+				code: "S11TNEXT_ARTIFACT_INVALID",
+				message: "omitIfEmpty sections must reference at least one variable",
 			}),
 		);
 	});
@@ -315,6 +403,7 @@ describe("catalog", () => {
 		expect(audit.binding).toEqual({
 			instructionLocale: "ja-JP",
 			fallbackLocales: ["en-US"],
+			trailingNewline: true,
 		});
 		expect(audit.finalManifest).toBe(final.manifest);
 		expect(audit.renderTrace.map(({ index, via, manifest }) => ({
@@ -352,6 +441,60 @@ describe("catalog", () => {
 			expect.objectContaining<S11tnextError>({ code: "S11TNEXT_VALUE_INVALID" }),
 		);
 		expect(first.finalize(later).finalManifest).toBe(later.manifest);
+	});
+
+	it("creates a byte-range receipt for fragments included in the final payload", () => {
+		const catalog = createCatalog(compoundArtifact());
+		const request = catalog.bindRequest({ instructionLocale: "ja-JP" });
+		const role = request.invoke("codingAgent.role-instructions", {});
+		const final = request.invoke("codingAgent.provider-prompt", {
+			value: role.content.text,
+		});
+		const audit = request.finalize(final, [role]);
+
+		expect(audit.composition?.payloadHash).toBe(final.manifest.renderedHash);
+		expect(audit.composition?.fragments).toEqual([
+			{
+				manifest: role.manifest,
+				startByte: new TextEncoder().encode("Provider: ").byteLength,
+				endByte: new TextEncoder().encode(`Provider: ${role.content.text}`)
+					.byteLength,
+			},
+		]);
+		const finalBytes = new TextEncoder().encode(final.content.text);
+		const fragment = audit.composition!.fragments[0]!;
+		expect(finalBytes.slice(fragment.startByte, fragment.endByte)).toEqual(
+			new TextEncoder().encode(role.content.text),
+		);
+	});
+
+	it("rejects composition claims for transformed or foreign fragments", () => {
+		const catalog = createCatalog(compoundArtifact());
+		const transformedRequest = catalog.bindRequest({ instructionLocale: "en-US" });
+		const transformedRole = transformedRequest.invoke(
+			"codingAgent.role-instructions",
+			{},
+		);
+		const transformedFinal = transformedRequest.invoke(
+			"codingAgent.provider-prompt",
+			{ value: transformedRole.content.text.toLowerCase() },
+		);
+		expect(() =>
+			transformedRequest.finalize(transformedFinal, [transformedRole]),
+		).toThrowError(
+			expect.objectContaining<S11tnextError>({ code: "S11TNEXT_VALUE_INVALID" }),
+		);
+
+		const request = catalog.bindRequest({ instructionLocale: "ja-JP" });
+		const foreign = catalog.bind({ instructionLocale: "ja-JP" })(
+			"codingAgent.role-instructions",
+			{},
+		);
+		const final = request.invoke("codingAgent.provider-prompt", { value: "changed" });
+
+		expect(() => request.finalize(final, [foreign])).toThrowError(
+			expect.objectContaining<S11tnextError>({ code: "S11TNEXT_VALUE_INVALID" }),
+		);
 	});
 
 	it("exports rendered hash helpers from the package root", () => {

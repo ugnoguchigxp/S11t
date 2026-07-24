@@ -13,10 +13,15 @@ export type TemplateSegment =
 export type S11tnextVariableType = "string" | "number" | "boolean" | "json";
 export type S11tnextVariableTrust = "trusted" | "untrusted";
 export type S11tnextVariablePlacement = "inline" | "delimited-context";
-export type S11tnextVariableEncoding = "raw" | "json-string" | "json-value";
+export type S11tnextVariableEncoding =
+	| "raw"
+	| "delimited-text"
+	| "json-string"
+	| "json-value";
+export type PromptMessageRole = "system" | "user";
 
 export type S11tnextCompiledVariable = {
-	required: true;
+	required: boolean;
 	type: S11tnextVariableType;
 	trust: S11tnextVariableTrust;
 	placement: S11tnextVariablePlacement;
@@ -31,14 +36,13 @@ export type S11tnextSectionKind =
 	| "overlay";
 
 export type S11tnextSectionSeverity = "must" | "should" | "may";
-export type S11tnextSectionEnforcement = "prompt" | "schema" | "host";
 
 export type S11tnextCompiledSection = {
 	id: string;
 	kind: S11tnextSectionKind;
 	severity: S11tnextSectionSeverity;
-	enforcement: S11tnextSectionEnforcement;
 	optimizable: boolean;
+	omitIfEmpty: boolean;
 	segments: TemplateSegment[];
 };
 
@@ -51,6 +55,7 @@ export type S11tnextCompiledContext = {
 	key: string;
 	owner: string;
 	contentKind: "text";
+	messageRole: PromptMessageRole;
 	sourceLocale: string;
 	requiredLocales: string[];
 	variables: Record<string, S11tnextCompiledVariable>;
@@ -61,6 +66,7 @@ export type S11tnextCompiledContext = {
 
 export type S11tnextCatalogArtifact = {
 	format: "s11tnext.catalog";
+	artifactVersion: 2;
 	compilerVersion: string;
 	releaseProfile: string;
 	policyDigest: string;
