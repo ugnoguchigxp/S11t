@@ -199,7 +199,6 @@ for (const entry of manifest.packages) {
 }
 
 const report = {
-	schemaVersion: 1,
 	channel,
 	distTag,
 	version,

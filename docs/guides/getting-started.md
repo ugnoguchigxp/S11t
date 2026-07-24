@@ -72,7 +72,8 @@ npm run s11t:build
 npm run s11t:check
 ```
 
-The build writes `.s11t/catalog.json` and `.s11t/catalog.generated.ts`. Commit them together.
+The build writes `.s11t/catalog.json` and `.s11t/catalog.generated.ts`. Both files are staged before
+installation and the previous pair is restored if installation fails. Commit them together.
 `--check` performs no writes and reports `S11T_BUILD_STALE` when either output differs.
 
 ## Bind one request
@@ -110,3 +111,15 @@ s11t inspect --coverage --locale en-US --fallback-locale ja-JP \
 S11t does not call an LLM provider and does not own authorization, retries, tool enforcement, or trace
 persistence. See [backend integration](./backend-integration.md) and
 [trust boundaries](./trust-boundaries.md).
+
+For command-specific help and optional shell completion:
+
+```sh
+s11t help build
+s11t completion zsh
+s11t --version
+```
+
+See [troubleshooting](./troubleshooting.md) for common installation, build, locale, and diagnostic
+problems. Upgrades across release lines should follow the
+[compatibility policy](../specification/compatibility.md).

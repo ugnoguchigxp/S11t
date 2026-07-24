@@ -26,6 +26,5 @@ export type {
 	S11tCompiledLocale,
 	S11tCompiledSection,
 	S11tCompiledVariable,
-	S11tRenderingContract,
 	TemplateSegment,
 } from "./types.js";

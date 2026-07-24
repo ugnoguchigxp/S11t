@@ -17,6 +17,12 @@ export const criticalCoverageRequirements = {
 		functions: 100,
 		lines: 95,
 	},
+	"packages/cli/src/generated-output.ts": {
+		statements: 85,
+		branches: 75,
+		functions: 100,
+		lines: 85,
+	},
 	"packages/cli/src/main.ts": {
 		statements: 75,
 		branches: 60,
@@ -34,6 +40,24 @@ export const criticalCoverageRequirements = {
 		branches: 70,
 		functions: 85,
 		lines: 80,
+	},
+	"packages/runtime/src/artifact-integrity.ts": {
+		statements: 80,
+		branches: 70,
+		functions: 100,
+		lines: 80,
+	},
+	"packages/runtime/src/catalog-rendering.ts": {
+		statements: 90,
+		branches: 80,
+		functions: 100,
+		lines: 90,
+	},
+	"packages/runtime/src/request-audit.ts": {
+		statements: 90,
+		branches: 90,
+		functions: 100,
+		lines: 90,
 	},
 	"packages/runtime/src/artifact-schema.ts": {
 		statements: 80,

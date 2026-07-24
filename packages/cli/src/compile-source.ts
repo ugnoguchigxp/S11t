@@ -19,7 +19,6 @@ export function compileProject(
 		project.documents.map((document) => document.definition),
 		{
 			releaseProfile: project.releaseProfile,
-			aliases: project.aliases,
 			provenance,
 		},
 	);

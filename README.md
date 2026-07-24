@@ -5,7 +5,13 @@ S11t is a backend-first toolkit for authoring, compiling, and rendering SystemCo
 Authors edit content-first TOML. The CLI emits deterministic JSON artifacts and TypeScript contracts, and
 applications load those artifacts into a filesystem-independent runtime.
 
-## Install
+## Development status
+
+S11t is in pre-release development. `@s11t/runtime` and `@s11t/cli` are not yet available from the npm
+registry, so the install commands below apply only after the first registry bootstrap. Until then, use
+this repository as a pnpm workspace and do not depend on the `0.0.0` development version from production.
+
+## Install after the first release
 
 ```sh
 npm install @s11t/runtime
@@ -39,7 +45,9 @@ the Git remote and package repository metadata are configured.
 
 The contracts are documented under [`docs/specification`](./docs/specification), with public JSON
 Schemas under [`schemas`](./schemas). See the [backend integration](./docs/guides/backend-integration.md)
-and [trust-boundary](./docs/guides/trust-boundaries.md) guides, or run
+and [trust-boundary](./docs/guides/trust-boundaries.md) guides, the
+[compatibility policy](./docs/specification/compatibility.md), and
+[troubleshooting guide](./docs/guides/troubleshooting.md), or run
 [`examples/node-basic`](./examples/node-basic).
 
 Maintainers preparing a registry release should follow the

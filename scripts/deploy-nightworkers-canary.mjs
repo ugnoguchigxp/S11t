@@ -101,7 +101,7 @@ function assertNightWorkers(target) {
 
 function validateManifest(path, commit) {
 	const manifest = readJson(path);
-	if (manifest.schemaVersion !== 1 || !Array.isArray(manifest.packages)) {
+	if (!Array.isArray(manifest.packages)) {
 		throw new Error("The S11t package manifest has an unsupported shape");
 	}
 	if (

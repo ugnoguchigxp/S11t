@@ -82,8 +82,7 @@ const sections: Record<string, S11tCompiledSection[]> = {
 
 describe("hash contract", () => {
 	it("matches all golden identity vectors", () => {
-		const renderingContract = "delimited-context" as const;
-		const definitionHash = hashDefinition(definition, renderingContract);
+		const definitionHash = hashDefinition(definition);
 		const artifactHashes = Object.fromEntries(
 			Object.entries(sections).map(([locale, compiledSections]) => [
 				locale,
@@ -91,7 +90,6 @@ describe("hash contract", () => {
 					key: definition.key,
 					locale,
 					sections: compiledSections,
-					renderingContract,
 				}),
 			]),
 		);
@@ -100,19 +98,15 @@ describe("hash contract", () => {
 			compilerVersion: "0.0.0",
 			definitionHash,
 			artifactHashes,
-			renderingContract,
 		});
 		const policyDigest = hashPolicy({
 			releaseProfile: "production",
 			requiredLocales: { [definition.key]: definition.requiredLocales },
-			renderingContract,
 		});
 		const catalogDigest = hashCatalog({
 			compilerVersion: "0.0.0",
 			policyDigest,
 			releaseDigests: { [definition.key]: releaseDigest },
-			aliases: { "example.greetingAlias": definition.key },
-			renderingContract,
 		});
 
 		expect({
@@ -124,18 +118,16 @@ describe("hash contract", () => {
 		}).toEqual(golden);
 	});
 
-	it("sorts policy, release and alias identity pairs", () => {
+	it("sorts policy and release identity pairs", () => {
 		expect(
 			hashPolicy({
 				releaseProfile: "production",
 				requiredLocales: { "z.last": ["ja-JP"], "a.first": ["en-US"] },
-				renderingContract: "delimited-context",
 			}),
 		).toBe(
 			hashPolicy({
 				releaseProfile: "production",
 				requiredLocales: { "a.first": ["en-US"], "z.last": ["ja-JP"] },
-				renderingContract: "delimited-context",
 			}),
 		);
 		expect(
@@ -143,16 +135,12 @@ describe("hash contract", () => {
 				compilerVersion: "0.0.0",
 				policyDigest: golden.policyDigest,
 				releaseDigests: { "z.last": "b", "a.first": "a" },
-				aliases: { "z.alias": "z.last", "a.alias": "a.first" },
-				renderingContract: "delimited-context",
 			}),
 		).toBe(
 			hashCatalog({
 				compilerVersion: "0.0.0",
 				policyDigest: golden.policyDigest,
 				releaseDigests: { "a.first": "a", "z.last": "b" },
-				aliases: { "a.alias": "a.first", "z.alias": "z.last" },
-				renderingContract: "delimited-context",
 			}),
 		);
 	});

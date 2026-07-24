@@ -59,20 +59,15 @@ export type S11tCompiledContext = {
 	releaseDigest: string;
 };
 
-export type S11tRenderingContract = "delimited-context";
-
 export type S11tCatalogArtifact = {
 	format: "s11t.catalog";
-	schemaVersion: 1;
 	compilerVersion: string;
 	releaseProfile: string;
 	policyDigest: string;
-	renderingContract: S11tRenderingContract;
 	createdFrom: {
 		configPath: string;
 		sourceFiles: string[];
 	};
 	contexts: Record<string, S11tCompiledContext>;
-	aliases: Record<string, string>;
 	catalogDigest: string;
 };

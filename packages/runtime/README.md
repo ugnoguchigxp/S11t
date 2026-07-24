@@ -2,6 +2,10 @@
 
 Portable S11t artifact contracts, deterministic compiler primitives, and the typed catalog API.
 This package uses no Node.js builtins, filesystem APIs, process state, or TOML parsing.
+Supported Node.js releases are 20.19+, 22, and 24.
+
+This package is in pre-release development and is not yet available from the npm registry. The install
+command below applies after the first registry bootstrap.
 
 ```sh
 npm install @s11t/runtime

@@ -1,5 +1,5 @@
 import { assertCatalogArtifact } from "./artifact-schema.js";
-import { assertCatalogIntegrity } from "./catalog.js";
+import { assertCatalogIntegrity } from "./artifact-integrity.js";
 import type {
 	CanonicalContextDefinition,
 	CanonicalSectionDefinition,
@@ -16,7 +16,6 @@ import type {
 	S11tCatalogArtifact,
 	S11tCompiledContext,
 	S11tCompiledSection,
-	S11tRenderingContract,
 	TemplateSegment,
 } from "./types.js";
 import { COMPILER_VERSION } from "./version.js";
@@ -29,11 +28,8 @@ export type {
 
 export { COMPILER_VERSION } from "./version.js";
 
-export const RENDERING_CONTRACT: S11tRenderingContract = "delimited-context";
-
 export type CompileCatalogOptions = {
 	releaseProfile: string;
-	aliases?: Record<string, string>;
 	provenance: {
 		configPath: string;
 		sourceFiles: string[];
@@ -125,7 +121,7 @@ function compileSections(
 
 function compileContext(definitionInput: CanonicalContextDefinition): S11tCompiledContext {
 	const definition = normalizedDefinition(definitionInput);
-	const definitionHash = hashDefinition(definition, RENDERING_CONTRACT);
+	const definitionHash = hashDefinition(definition);
 	const artifactHashes: Record<string, string> = {};
 	const availableLocales = [
 		...new Set(definition.sections.flatMap((section) => Object.keys(section.locales))),
@@ -137,7 +133,6 @@ function compileContext(definitionInput: CanonicalContextDefinition): S11tCompil
 				key: definition.key,
 				locale,
 				sections,
-				renderingContract: RENDERING_CONTRACT,
 			});
 			artifactHashes[locale] = artifactHash;
 			return [locale, { sections, artifactHash }];
@@ -148,7 +143,6 @@ function compileContext(definitionInput: CanonicalContextDefinition): S11tCompil
 		compilerVersion: COMPILER_VERSION,
 		definitionHash,
 		artifactHashes,
-		renderingContract: RENDERING_CONTRACT,
 	});
 	return {
 		key: definition.key,
@@ -161,20 +155,6 @@ function compileContext(definitionInput: CanonicalContextDefinition): S11tCompil
 		definitionHash,
 		releaseDigest,
 	};
-}
-
-function validateAliases(
-	aliases: Record<string, string>,
-	contexts: Record<string, S11tCompiledContext>,
-): void {
-	for (const [alias, target] of Object.entries(aliases)) {
-		if (alias === target || Object.hasOwn(contexts, alias) || !Object.hasOwn(contexts, target)) {
-			throw new TypeError(`Invalid context alias: ${alias} -> ${target}`);
-		}
-		if (Object.hasOwn(aliases, target)) {
-			throw new TypeError(`Context alias chains are not supported: ${alias} -> ${target}`);
-		}
-	}
 }
 
 export function compileCatalog(
@@ -196,36 +176,24 @@ export function compileCatalog(
 		releaseDigests[definition.key] = context.releaseDigest;
 		requiredLocales[definition.key] = [...context.requiredLocales];
 	}
-	const aliases = Object.fromEntries(
-		Object.entries(options.aliases ?? {}).sort(([left], [right]) =>
-			compareCodeUnits(left, right),
-		),
-	);
-	validateAliases(aliases, contexts);
 	const policyDigest = hashPolicy({
 		releaseProfile: options.releaseProfile,
 		requiredLocales,
-		renderingContract: RENDERING_CONTRACT,
 	});
 	const artifact: S11tCatalogArtifact = {
 		format: "s11t.catalog",
-		schemaVersion: 1,
 		compilerVersion: COMPILER_VERSION,
 		releaseProfile: options.releaseProfile,
 		policyDigest,
-		renderingContract: RENDERING_CONTRACT,
 		createdFrom: {
 			configPath: options.provenance.configPath,
 			sourceFiles: [...options.provenance.sourceFiles].sort(compareCodeUnits),
 		},
 		contexts,
-		aliases,
 		catalogDigest: hashCatalog({
 			compilerVersion: COMPILER_VERSION,
 			policyDigest,
 			releaseDigests,
-			aliases,
-			renderingContract: RENDERING_CONTRACT,
 		}),
 	};
 	assertCatalogArtifact(artifact);

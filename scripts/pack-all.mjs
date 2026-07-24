@@ -90,6 +90,6 @@ for (const definition of packageDefinitions) {
 const versions = new Set(packages.map((entry) => entry.version));
 if (versions.size !== 1) throw new Error("Runtime and CLI tarballs must share one version");
 
-const manifest = { schemaVersion: 1, packages };
+const manifest = { packages };
 writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, "utf8");
 process.stdout.write(`Packed ${packages.length} packages into ${relative(repositoryRoot, outputDirectory)}.\n`);

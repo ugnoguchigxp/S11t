@@ -30,7 +30,7 @@ function run(command, arguments_, options = {}) {
 }
 
 try {
-	if (manifest.schemaVersion !== 1 || !Array.isArray(manifest.packages) || manifest.packages.length !== 2) {
+	if (!Array.isArray(manifest.packages) || manifest.packages.length !== 2) {
 		throw new Error("Package manifest is invalid");
 	}
 	cpSync(fixtureRoot, temporary, { recursive: true });
@@ -95,8 +95,6 @@ try {
 		invocation.manifest?.requestedLocale !== "ja-JP" ||
 		invocation.manifest?.resolvedLocale !== "ja-JP" ||
 		invocation.manifest?.fallbackLocales?.length !== 0 ||
-		invocation.manifest?.artifactSchemaVersion !== 1 ||
-		invocation.manifest?.renderingContract !== "delimited-context" ||
 		invocation.manifest?.renderedHash === undefined ||
 		invocation.manifest?.releaseDigest === undefined ||
 		invocation.manifest?.policyDigest === undefined

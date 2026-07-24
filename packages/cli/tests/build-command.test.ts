@@ -66,12 +66,10 @@ describe("build command", () => {
 			releaseProfile: "production",
 		});
 		const artifact = JSON.parse(readFileSync(result.catalogPath, "utf8")) as {
-			schemaVersion: number;
-			renderingContract: string;
+			format: string;
 		};
 		expect(artifact).toMatchObject({
-			schemaVersion: 1,
-			renderingContract: "delimited-context",
+			format: "s11t.catalog",
 		});
 		expect(readFileSync(result.typesPath, "utf8")).toContain(
 			'import { createCatalog } from "@s11t/runtime";',

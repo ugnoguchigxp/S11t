@@ -18,7 +18,6 @@ export type LoadedProject = {
 	config: S11tProjectConfig;
 	documents: ResolvedAuthoringDocument[];
 	releaseProfile: string;
-	aliases: Record<string, string>;
 };
 
 function compareCodeUnits(left: string, right: string): number {
@@ -102,7 +101,7 @@ export function loadProject(
 			options,
 		);
 	});
-	const aliases = validateResolvedDocuments(documents, config);
+	validateResolvedDocuments(documents);
 	return {
 		config,
 		configPath,
@@ -110,6 +109,5 @@ export function loadProject(
 		documents,
 		sourceFiles,
 		releaseProfile,
-		aliases,
 	};
 }

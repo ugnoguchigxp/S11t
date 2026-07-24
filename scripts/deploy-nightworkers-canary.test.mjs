@@ -88,7 +88,7 @@ function fakeDeploymentDependencies(target, failureCheckpoint) {
 		});
 		writeFileSync(
 			resolve(directory, "manifest.json"),
-			`${JSON.stringify({ schemaVersion: 1, packages }, null, 2)}\n`,
+			`${JSON.stringify({ packages }, null, 2)}\n`,
 		);
 	}
 	function installTarget() {

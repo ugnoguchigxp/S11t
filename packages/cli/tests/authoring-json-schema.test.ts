@@ -10,7 +10,7 @@ const schema = JSON.parse(
 const validate = new Ajv2020({ strict: true }).compile(schema);
 
 describe("authoring JSON Schema", () => {
-	it("accepts the content-first fixture and rejects version metadata", () => {
+	it("accepts the content-first fixture and rejects unsupported contract fields", () => {
 		const source = parse(
 			readFileSync(
 				new URL("../../../fixtures/valid/content-first/contexts/structuredGeneration/repair.context.toml", import.meta.url),
@@ -19,5 +19,6 @@ describe("authoring JSON Schema", () => {
 		);
 		expect(validate(source)).toBe(true);
 		expect(validate({ ...source, schema_version: 1 })).toBe(false);
+		expect(validate({ ...source, key: "legacy.override" })).toBe(false);
 	});
 });

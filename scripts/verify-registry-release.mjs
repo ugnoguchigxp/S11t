@@ -26,7 +26,6 @@ function npmJson(arguments_) {
 }
 
 if (
-	report.schemaVersion !== 1 ||
 	(report.channel !== "canary" && report.channel !== "stable") ||
 	(report.distTag !== "canary" && report.distTag !== "latest") ||
 	typeof report.version !== "string" ||

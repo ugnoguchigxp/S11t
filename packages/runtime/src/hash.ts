@@ -6,7 +6,6 @@ import { canonicalJson } from "./canonical-json.js";
 import type {
 	JsonValue,
 	S11tCompiledSection,
-	S11tRenderingContract,
 } from "./types.js";
 
 const HASH_DOMAINS = {
@@ -34,10 +33,8 @@ function hashCanonical(domain: string, value: JsonValue): S11tDigest {
 
 export function hashDefinition(
 	value: CanonicalContextDefinition,
-	renderingContract: S11tRenderingContract,
 ): S11tDigest {
 	return hashCanonical(HASH_DOMAINS.definition, {
-		renderingContract,
 		key: value.key,
 		owner: value.owner,
 		contentKind: value.contentKind,
@@ -52,7 +49,6 @@ export function hashArtifact(value: {
 	key: string;
 	locale: string;
 	sections: S11tCompiledSection[];
-	renderingContract: S11tRenderingContract;
 }): S11tDigest {
 	return hashCanonical(HASH_DOMAINS.artifact, value);
 }
@@ -62,12 +58,9 @@ export function hashRelease(value: {
 	compilerVersion: string;
 	definitionHash: string;
 	artifactHashes: Record<string, string>;
-	renderingContract: S11tRenderingContract;
 }): S11tDigest {
 	return hashCanonical(HASH_DOMAINS.release, {
 		key: value.key,
-		schemaVersion: 1,
-		renderingContract: value.renderingContract,
 		compilerVersion: value.compilerVersion,
 		definitionHash: value.definitionHash,
 		artifacts: Object.entries(value.artifactHashes).sort(([left], [right]) =>
@@ -79,10 +72,8 @@ export function hashRelease(value: {
 export function hashPolicy(value: {
 	releaseProfile: string;
 	requiredLocales: Record<string, string[]>;
-	renderingContract: S11tRenderingContract;
 }): S11tDigest {
 	return hashCanonical(HASH_DOMAINS.policy, {
-		renderingContract: value.renderingContract,
 		releaseProfile: value.releaseProfile,
 		requiredLocales: Object.entries(value.requiredLocales).sort(([left], [right]) =>
 			compareCodeUnits(left, right),
@@ -94,18 +85,11 @@ export function hashCatalog(value: {
 	compilerVersion: string;
 	policyDigest: string;
 	releaseDigests: Record<string, string>;
-	aliases: Record<string, string>;
-	renderingContract: S11tRenderingContract;
 }): S11tDigest {
 	return hashCanonical(HASH_DOMAINS.catalog, {
-		schemaVersion: 1,
-		renderingContract: value.renderingContract,
 		compilerVersion: value.compilerVersion,
 		policyDigest: value.policyDigest,
 		releases: Object.entries(value.releaseDigests).sort(([left], [right]) =>
-			compareCodeUnits(left, right),
-		),
-		aliases: Object.entries(value.aliases).sort(([left], [right]) =>
 			compareCodeUnits(left, right),
 		),
 	});

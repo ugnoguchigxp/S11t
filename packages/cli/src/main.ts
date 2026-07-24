@@ -1,4 +1,7 @@
+import { COMPILER_VERSION } from "@s11t/runtime/compiler";
+
 import { buildProject } from "./build-command.js";
+import { completionScript, type CompletionShell } from "./completion.js";
 import { S11tDiagnosticError, type S11tDiagnostic } from "./diagnostics.js";
 import { inspectContext, inspectCoverage } from "./inspect-command.js";
 import { lintProject } from "./lint-command.js";
@@ -10,8 +13,42 @@ Usage:
   s11t build --release-profile name [--config s11t.config.toml] [--check] [--format human|json]
   s11t inspect <key> --release-profile name [--resolved] [--locale ja-JP] [--config s11t.config.toml] [--format human|json]
   s11t inspect --coverage --locale en-US --release-profile name [--fallback-locale ja-JP] [--config s11t.config.toml] [--format human|json]
+  s11t completion bash|zsh|fish
+  s11t help [command]
+  s11t --version
   s11t --help
 `;
+
+const COMMAND_HELP: Record<string, string> = {
+	lint: `Usage: s11t lint --release-profile name [--config path] [--format human|json]
+
+Validate configuration, authored contexts, locale policy, and variable safety without writing files.
+`,
+	build: `Usage: s11t build --release-profile name [--config path] [--check] [--format human|json]
+
+Compile deterministic catalog.json and catalog.generated.ts outputs.
+--check verifies that both generated files are current without writing them.
+`,
+	inspect: `Usage:
+  s11t inspect <key> --release-profile name [--resolved] [--locale locale] [--config path] [--format human|json]
+  s11t inspect --coverage --locale locale --release-profile name [--fallback-locale locale] [--config path] [--format human|json]
+
+Inspect a canonical context or report direct, fallback, and missing locale coverage.
+`,
+	completion: `Usage: s11t completion bash|zsh|fish
+
+Print a completion script to stdout. Evaluate it for the current shell or save it in the shell's
+completion directory.
+`,
+	help: `Usage: s11t help [lint|build|inspect|completion|version]
+
+Show global help or detailed help for one command.
+`,
+	version: `Usage: s11t version
+
+Print the S11t CLI and compiler version.
+`,
+};
 
 export type CommandIo = {
 	stdout(value: string): void;
@@ -92,13 +129,72 @@ export function runCli(
 	},
 ): number {
 	const arguments_ = [...argumentsInput];
-	if (arguments_.length === 0 || arguments_.includes("--help") || arguments_.includes("-h")) {
+	if (
+		arguments_.length === 0 ||
+		arguments_[0] === "--help" ||
+		arguments_[0] === "-h"
+	) {
 		io.stdout(HELP);
 		return 0;
 	}
+	if (
+		arguments_.length === 1 &&
+		(arguments_[0] === "--version" || arguments_[0] === "-V")
+	) {
+		io.stdout(`${COMPILER_VERSION}\n`);
+		return 0;
+	}
 	const command = arguments_.shift();
+	if (command === "version") {
+		if (arguments_.length > 0) {
+			io.stderr(`version does not accept arguments\n\n${COMMAND_HELP.version}`);
+			return 2;
+		}
+		io.stdout(`${COMPILER_VERSION}\n`);
+		return 0;
+	}
+	if (command === "help") {
+		const topic = arguments_.shift();
+		if (arguments_.length > 0) {
+			io.stderr(`help accepts at most one command\n\n${COMMAND_HELP.help}`);
+			return 2;
+		}
+		if (topic === undefined) {
+			io.stdout(HELP);
+			return 0;
+		}
+		const help = COMMAND_HELP[topic];
+		if (help === undefined) {
+			io.stderr(`Unknown help topic: ${topic}\n\n${COMMAND_HELP.help}`);
+			return 2;
+		}
+		io.stdout(help);
+		return 0;
+	}
+	if (arguments_.includes("--help") || arguments_.includes("-h")) {
+		const help = command === undefined ? undefined : COMMAND_HELP[command];
+		if (help === undefined) {
+			io.stderr(`Unknown command: ${command ?? ""}\n\n${HELP}`);
+			return 2;
+		}
+		io.stdout(help);
+		return 0;
+	}
 	let format = "human";
 	try {
+		if (command === "completion") {
+			const shell = arguments_.shift();
+			if (
+				arguments_.length > 0 ||
+				(shell !== "bash" && shell !== "zsh" && shell !== "fish")
+			) {
+				throw new CliUsageError(
+					"completion requires exactly one shell: bash, zsh, or fish",
+				);
+			}
+			io.stdout(completionScript(shell as CompletionShell));
+			return 0;
+		}
 		format = takeOption(arguments_, "--format") ?? "human";
 		if (format !== "human" && format !== "json") {
 			throw new CliUsageError("--format must be human or json");

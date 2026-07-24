@@ -14,7 +14,6 @@ export type S11tProjectConfig = {
 	keyspaces: Record<string, { owner: string }>;
 	releaseProfiles: Record<string, S11tReleaseProfile>;
 	variableProfiles: Record<string, CanonicalVariableDefinition>;
-	keyAliases: Record<string, string>;
 };
 
 type Path = Array<string | number>;
@@ -164,7 +163,6 @@ export function parseProjectConfig(
 			"keyspaces",
 			"release_profiles",
 			"variable_profiles",
-			"key_aliases",
 		],
 		[
 			"source_dir",
@@ -179,6 +177,7 @@ export function parseProjectConfig(
 	);
 	const authoring = object(source.authoring, file, ["authoring"]);
 	exactKeys(authoring, ["source_locale"], ["source_locale"], file, ["authoring"]);
+	const sourceLocale = locale(authoring.source_locale, file, ["authoring", "source_locale"]);
 	const governance = object(source.governance, file, ["governance"]);
 	exactKeys(governance, ["require_owner"], ["require_owner"], file, ["governance"]);
 	if (typeof governance.require_owner !== "boolean") issue(file, "Expected a boolean", ["governance", "require_owner"]);
@@ -198,29 +197,32 @@ export function parseProjectConfig(
 		if (!PROFILE_NAME_PATTERN.test(name)) issue(file, "Invalid release profile name", ["release_profiles", name]);
 		const entry = object(value, file, ["release_profiles", name]);
 		exactKeys(entry, ["required_locales"], ["required_locales"], file, ["release_profiles", name]);
-		releaseProfiles[name] = {
-			requiredLocales: localeArray(entry.required_locales, file, ["release_profiles", name, "required_locales"]),
-		};
+		const requiredLocales = localeArray(
+			entry.required_locales,
+			file,
+			["release_profiles", name, "required_locales"],
+		);
+		const resolvedLocales = requiredLocales.map((value) =>
+			value === "$source" ? sourceLocale : value,
+		);
+		if (new Set(resolvedLocales).size !== resolvedLocales.length) {
+			issue(
+				file,
+				"Locales must remain unique after resolving $source",
+				["release_profiles", name, "required_locales"],
+			);
+		}
+		releaseProfiles[name] = { requiredLocales };
 	}
 	if (Object.keys(releaseProfiles).length === 0) issue(file, "At least one release profile is required", ["release_profiles"]);
-
-	const aliasSource = source.key_aliases === undefined ? {} : object(source.key_aliases, file, ["key_aliases"]);
-	const keyAliases: Record<string, string> = {};
-	for (const [alias, value] of Object.entries(aliasSource)) {
-		if (!DOT_KEY_PATTERN.test(alias)) issue(file, "Alias key must use dot notation", ["key_aliases", alias]);
-		const target = string(value, file, ["key_aliases", alias]);
-		if (!DOT_KEY_PATTERN.test(target)) issue(file, "Alias target must be a dot key", ["key_aliases", alias]);
-		keyAliases[alias] = target;
-	}
 
 	return {
 		sourceDir: relativeDirectory(source.source_dir, file, ["source_dir"]),
 		outDir: relativeDirectory(source.out_dir, file, ["out_dir"]),
-		authoring: { sourceLocale: locale(authoring.source_locale, file, ["authoring", "source_locale"]) },
+		authoring: { sourceLocale },
 		governance: { requireOwner: governance.require_owner },
 		keyspaces,
 		releaseProfiles,
 		variableProfiles: parseVariableProfiles(source.variable_profiles, file),
-		keyAliases,
 	};
 }

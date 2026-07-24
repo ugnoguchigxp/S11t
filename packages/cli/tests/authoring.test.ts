@@ -40,9 +40,6 @@ describe("content-first authoring", () => {
 	it("derives a dot key and expands project-level locale and variable policy", () => {
 		const project = compileProject(undefined, fixtureRoot, "production");
 		expect(Object.keys(project.artifact.contexts)).toEqual(["structuredGeneration.repair"]);
-		expect(project.artifact.aliases).toEqual({
-			"structuredGeneration.repairAlias": "structuredGeneration.repair",
-		});
 		expect(project.artifact.contexts["structuredGeneration.repair"]).toMatchObject({
 			key: "structuredGeneration.repair",
 			owner: "structured-generation",
@@ -84,15 +81,13 @@ describe("content-first authoring", () => {
 	});
 
 	it("reports resolved values and their top-level origins", () => {
-		const result = inspectContext("structuredGeneration.repairAlias", {
+		const result = inspectContext("structuredGeneration.repair", {
 			cwd: fixtureRoot,
 			releaseProfile: "production",
 			resolved: true,
 		}) as Record<string, unknown>;
 		expect(result).toMatchObject({
 			key: "structuredGeneration.repair",
-			requestedKey: "structuredGeneration.repairAlias",
-			aliasUsed: true,
 			sourceLocale: "ja-JP",
 			releaseProfile: "production",
 			origins: {
@@ -112,7 +107,6 @@ describe("content-first authoring", () => {
 		).toEqual(
 			expect.objectContaining({
 				key: "structuredGeneration.repair",
-				requestedKey: "structuredGeneration.repair",
 				locale: "en-US",
 			}),
 		);
@@ -145,7 +139,6 @@ describe("content-first authoring", () => {
 				fallbackLocales: ["fr-FR"],
 			}),
 		).toEqual({
-			schemaVersion: 1,
 			releaseProfile: "development",
 			sourceLocale: "ja-JP",
 			requestedLocale: "en-US",
@@ -193,6 +186,41 @@ describe("content-first authoring", () => {
 		);
 	});
 
+	it("rejects release locales that collide after resolving $source", () => {
+		expectDiagnostic(
+			() =>
+				parseProjectConfig({
+					source_dir: "contexts",
+					out_dir: "generated",
+					authoring: { source_locale: "ja-JP" },
+					governance: { require_owner: true },
+					keyspaces: { example: { owner: "examples" } },
+					release_profiles: {
+						development: { required_locales: ["$source", "ja-JP"] },
+					},
+				}),
+			"S11T_CONFIG_INVALID",
+		);
+	});
+
+	it("rejects the removed key_aliases configuration field", () => {
+		expectDiagnostic(
+			() =>
+				parseProjectConfig({
+					source_dir: "contexts",
+					out_dir: "generated",
+					authoring: { source_locale: "ja-JP" },
+					governance: { require_owner: true },
+					keyspaces: { example: { owner: "examples" } },
+					release_profiles: {
+						development: { required_locales: ["$source"] },
+					},
+					key_aliases: { "example.old": "example.current" },
+				}),
+			"S11T_CONFIG_INVALID",
+		);
+	});
+
 	it("rejects a translation that attempts to override the source locale", () => {
 		expect(() =>
 			parseAndResolveAuthoring(
@@ -214,20 +242,63 @@ describe("content-first authoring", () => {
 		);
 	});
 
-	it("rejects an alias whose target is not a compiled context", () => {
-		const config = testConfig();
-		config.keyAliases["example.greetingAlias"] = "example.other";
-		const document = parseAndResolveAuthoring(
-			{ text: "正本" },
-			"contexts/example/greeting.context.toml",
-			"example/greeting.context.toml",
-			config,
-			"development",
-		);
-		expect(() => validateResolvedDocuments([document], config)).toThrowError(
-			expect.objectContaining({
-				diagnostics: [expect.objectContaining({ code: "S11T_KEY_ALIAS_INVALID" })],
-			}),
+	it.each([
+		{
+			name: "missing placeholder in root translation",
+			input: {
+				text: "こんにちは [[name]]",
+				translations: { "en-US": { text: "Hello" } },
+				variables: {
+					name: {
+						type: "string",
+						trust: "trusted",
+						placement: "inline",
+						encoding: "raw",
+					},
+				},
+			},
+		},
+		{
+			name: "extra placeholder in section translation",
+			input: {
+				variables: {
+					name: {
+						type: "string",
+						trust: "trusted",
+						placement: "inline",
+						encoding: "raw",
+					},
+					detail: {
+						type: "string",
+						trust: "trusted",
+						placement: "inline",
+						encoding: "raw",
+					},
+				},
+				sections: [
+					{
+						id: "context.text",
+						kind: "instruction",
+						severity: "must",
+						enforcement: "prompt",
+						optimizable: false,
+						text: "こんにちは [[name]]",
+						translations: { "en-US": { text: "Hello [[name]] [[detail]]" } },
+					},
+				],
+			},
+		},
+	])("rejects $name", ({ input }) => {
+		expectDiagnostic(
+			() =>
+				parseAndResolveAuthoring(
+					input,
+					"contexts/example/greeting.context.toml",
+					"example/greeting.context.toml",
+					testConfig(),
+					"development",
+				),
+			"S11T_TRANSLATION_PLACEHOLDER_MISMATCH",
 		);
 	});
 
@@ -289,10 +360,10 @@ describe("content-first authoring", () => {
 			code: "S11T_KEY_INVALID",
 		},
 		{
-			name: "invalid explicit key",
+			name: "explicit key",
 			input: { key: "example:greeting", text: "正本" },
 			sourcePath: "example/greeting.context.toml",
-			code: "S11T_KEY_INVALID",
+			code: "S11T_SOURCE_INVALID",
 		},
 		{
 			name: "unsupported content kind",
@@ -476,7 +547,7 @@ describe("content-first authoring", () => {
 		);
 		expect(document.definition.owner).toBe("unowned");
 		expectDiagnostic(
-			() => validateResolvedDocuments([document, { ...document, file: "duplicate.toml" }], config),
+			() => validateResolvedDocuments([document, { ...document, file: "duplicate.toml" }]),
 			"S11T_KEY_COLLISION",
 		);
 	});

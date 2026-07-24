@@ -5,7 +5,6 @@
   "type": "object",
   "additionalProperties": false,
   "properties": {
-    "key": { "$ref": "#/$defs/dotKey" },
     "content_kind": { "const": "text" },
     "text": { "type": "string", "minLength": 1 },
     "translations": { "$ref": "#/$defs/translations" },
@@ -31,10 +30,6 @@
     }
   ],
   "$defs": {
-    "dotKey": {
-      "type": "string",
-      "pattern": "^[A-Za-z][A-Za-z0-9_-]*(?:\\.[A-Za-z][A-Za-z0-9_-]*)*$"
-    },
     "translation": {
       "type": "object",
       "additionalProperties": false,

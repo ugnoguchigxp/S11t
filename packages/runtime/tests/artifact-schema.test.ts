@@ -5,7 +5,6 @@ import { describe, expect, it } from "vitest";
 
 import { compileCatalog, type CanonicalContextDefinition } from "../src/compiler.js";
 import { isCatalogArtifact } from "../src/artifact-schema.js";
-import { createCatalog, S11tError } from "../src/index.js";
 
 function artifact() {
 	const definition: CanonicalContextDefinition = {
@@ -28,7 +27,6 @@ function artifact() {
 	};
 	return compileCatalog([definition], {
 		releaseProfile: "development",
-		aliases: { "example.greetingAlias": "example.greeting" },
 		provenance: { configPath: "s11t.config.toml", sourceFiles: ["contexts/example.context.toml"] },
 	});
 }
@@ -47,6 +45,16 @@ describe("artifact schema", () => {
 		invalid.extra = true;
 		expect(isCatalogArtifact(invalid)).toBe(false);
 		expect(validateJsonSchema(invalid)).toBe(false);
+	});
+
+	it.each([
+		{ schemaVersion: 1 },
+		{ renderingContract: "delimited-context" },
+		{ aliases: {} },
+	])("rejects removed artifact fields in both validators", (removedField) => {
+		const input = { ...artifact(), ...removedField };
+		expect(isCatalogArtifact(input)).toBe(false);
+		expect(validateJsonSchema(input)).toBe(false);
 	});
 
 	it.each([
@@ -81,16 +89,6 @@ describe("artifact schema", () => {
 		mutate(input);
 		expect(isCatalogArtifact(input)).toBe(false);
 		expect(validateJsonSchema(input)).toBe(false);
-	});
-
-	it("leaves cross-field alias integrity to the runtime validator", () => {
-		const input = artifact();
-		input.aliases["example.greetingAlias"] = "missing.context";
-		expect(isCatalogArtifact(input)).toBe(true);
-		expect(validateJsonSchema(input)).toBe(true);
-		expect(() => createCatalog(input)).toThrowError(
-			expect.objectContaining<Partial<S11tError>>({ code: "S11T_ARTIFACT_INVALID" }),
-		);
 	});
 
 	it("rejects untrusted variables without delimited placement", () => {

@@ -27,7 +27,6 @@ type Path = Array<string | number>;
 type UnknownRecord = Record<string, unknown>;
 
 const DOT_SEGMENT_PATTERN = /^[A-Za-z][A-Za-z0-9_-]*$/;
-const DOT_KEY_PATTERN = /^[A-Za-z][A-Za-z0-9_-]*(?:\.[A-Za-z][A-Za-z0-9_-]*)*$/;
 const VARIABLE_NAME_PATTERN = /^[A-Za-z][A-Za-z0-9_]*$/;
 const LOCALE_PATTERN = /^[A-Za-z]{2,8}(?:-[A-Za-z0-9]{1,8})*$/;
 const PLACEHOLDER_PATTERN = /\[\[([A-Za-z][A-Za-z0-9_]*)\]\]/g;
@@ -126,10 +125,9 @@ function resolveRequiredLocales(
 	if (profile === undefined) {
 		return issue(file, "S11T_RELEASE_PROFILE_NOT_FOUND", `Release profile not found: ${releaseProfile}`, []);
 	}
-	const resolved = profile.requiredLocales.map((locale) =>
+	return profile.requiredLocales.map((locale) =>
 		locale === "$source" ? config.authoring.sourceLocale : locale,
 	);
-	return [...new Set(resolved)];
 }
 
 function parseTranslations(
@@ -218,11 +216,14 @@ function parseVariables(
 function validateVariableReferences(
 	sections: CanonicalSectionDefinition[],
 	variables: Record<string, CanonicalVariableDefinition>,
+	sourceLocale: string,
 	file: string,
 ): void {
 	const referenced = new Set<string>();
 	for (const [sectionIndex, section] of sections.entries()) {
+		const placeholdersByLocale = new Map<string, Set<string>>();
 		for (const [locale, text] of Object.entries(section.locales)) {
+			const placeholders = new Set<string>();
 			const remaining = text.replace(PLACEHOLDER_PATTERN, "");
 			if (remaining.includes("[[") || remaining.includes("]]")) {
 				issue(file, "S11T_PLACEHOLDER_INVALID", "Invalid placeholder syntax", ["sections", sectionIndex, "locales", locale]);
@@ -233,8 +234,31 @@ function validateVariableReferences(
 					if (!Object.hasOwn(variables, name)) {
 						issue(file, "S11T_VARIABLE_UNDECLARED", `Placeholder references undeclared variable: ${name}`, ["sections", sectionIndex, "locales", locale]);
 					}
+					placeholders.add(name);
 					referenced.add(name);
 				}
+			}
+			placeholdersByLocale.set(locale, placeholders);
+		}
+		const sourcePlaceholders = placeholdersByLocale.get(sourceLocale);
+		if (sourcePlaceholders === undefined) {
+			issue(file, "S11T_TRANSLATION_MISSING", `Missing source locale: ${sourceLocale}`, ["sections", sectionIndex, "locales", sourceLocale]);
+		}
+		for (const [locale, placeholders] of placeholdersByLocale) {
+			if (locale === sourceLocale) continue;
+			const missing = [...sourcePlaceholders].filter((name) => !placeholders.has(name)).sort();
+			const extra = [...placeholders].filter((name) => !sourcePlaceholders.has(name)).sort();
+			if (missing.length > 0 || extra.length > 0) {
+				const details = [
+					missing.length > 0 ? `missing: ${missing.join(", ")}` : "",
+					extra.length > 0 ? `extra: ${extra.join(", ")}` : "",
+				].filter(Boolean).join("; ");
+				issue(
+					file,
+					"S11T_TRANSLATION_PLACEHOLDER_MISMATCH",
+					`Translation placeholders must match ${sourceLocale} (${details})`,
+					["sections", sectionIndex, "locales", locale],
+				);
 			}
 		}
 	}
@@ -340,10 +364,8 @@ export function parseAndResolveAuthoring(
 	options: { validateRequiredCoverage?: boolean } = {},
 ): ResolvedAuthoringDocument {
 	const source = object(input, file, []);
-	exactKeys(source, ["key", "content_kind", "text", "translations", "variables", "sections"], [], file, []);
-	const pathKey = deriveKey(sourcePath, file);
-	const key = source.key === undefined ? pathKey : string(source.key, file, ["key"]);
-	if (!DOT_KEY_PATTERN.test(key)) issue(file, "S11T_KEY_INVALID", "Explicit key must use dot notation", ["key"]);
+	exactKeys(source, ["content_kind", "text", "translations", "variables", "sections"], [], file, []);
+	const key = deriveKey(sourcePath, file);
 	if (source.content_kind !== undefined && source.content_kind !== "text") {
 		issue(file, "S11T_SOURCE_INVALID", "Only text content is supported", ["content_kind"]);
 	}
@@ -365,7 +387,7 @@ export function parseAndResolveAuthoring(
 		file,
 		options.validateRequiredCoverage !== false,
 	);
-	validateVariableReferences(sections, variables.definitions, file);
+	validateVariableReferences(sections, variables.definitions, config.authoring.sourceLocale, file);
 	return {
 		file,
 		sourcePath,
@@ -379,7 +401,7 @@ export function parseAndResolveAuthoring(
 			sections,
 		},
 		origins: {
-			key: source.key === undefined ? `path:${sourcePath}` : `${file}#key`,
+			key: `path:${sourcePath}`,
 			owner: owner.source,
 			contentKind: "built-in:text",
 			sourceLocale: "authoring.source_locale",
@@ -391,10 +413,8 @@ export function parseAndResolveAuthoring(
 
 export function validateResolvedDocuments(
 	documents: readonly ResolvedAuthoringDocument[],
-	config: S11tProjectConfig,
-): Record<string, string> {
+): void {
 	const keys = new Map<string, string>();
-	const aliases: Record<string, string> = { ...config.keyAliases };
 	for (const document of documents) {
 		const previous = keys.get(document.definition.key);
 		if (previous !== undefined) {
@@ -402,10 +422,4 @@ export function validateResolvedDocuments(
 		}
 		keys.set(document.definition.key, document.file);
 	}
-	for (const [alias, target] of Object.entries(aliases)) {
-		if (alias === target || keys.has(alias) || !keys.has(target) || Object.hasOwn(aliases, target)) {
-			issue("s11t.config.toml", "S11T_KEY_ALIAS_INVALID", `Invalid key alias: ${alias} -> ${target}`, ["key_aliases", alias]);
-		}
-	}
-	return aliases;
 }

@@ -2,6 +2,7 @@
   "name": "@s11t/cli",
   "version": "0.0.0",
   "description": "TOML authoring and build CLI for S11t",
+  "keywords": ["llm", "prompt", "system-context", "prompt-management", "cli"],
   "type": "module",
   "types": "./dist/index.d.ts",
   "license": "Apache-2.0",
@@ -14,7 +15,7 @@
   "bugs": {
     "url": "https://github.com/ugnoguchigxp/S11t/issues"
   },
-  "files": ["bin", "dist", "README.md", "LICENSE", "NOTICE", "SECURITY.md", "CONTRIBUTING.md", "CHANGELOG.md"],
+  "files": ["bin", "dist", "README.md", "LICENSE", "NOTICE"],
   "bin": {
     "s11t": "./bin/s11t.js"
   },
@@ -32,7 +33,7 @@
     "registry": "https://registry.npmjs.org/"
   },
   "scripts": {
-    "build": "tsc -b --pretty false",
+    "build": "tsc -b --pretty false && node ../../scripts/bundle-packages.mjs cli",
     "typecheck": "tsc -b --pretty false",
     "test": "vitest run"
   },

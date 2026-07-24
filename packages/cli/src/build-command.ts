@@ -1,12 +1,12 @@
-import { randomBytes } from "node:crypto";
-import { mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
-import { basename, resolve } from "node:path";
+import { mkdirSync, readFileSync } from "node:fs";
+import { resolve } from "node:path";
 
 import { assertCatalogArtifact } from "@s11t/runtime";
 
 import { compileProject } from "./compile-source.js";
 import { S11tDiagnosticError, type S11tDiagnostic } from "./diagnostics.js";
 import { emitTypes } from "./emit-types.js";
+import { replaceGeneratedPair } from "./generated-output.js";
 
 export type BuildResult = {
 	catalogPath: string;
@@ -34,17 +34,6 @@ function sameBytes(path: string, expected: string): boolean {
 	}
 }
 
-function atomicWrite(path: string, content: string): void {
-	const nonce = randomBytes(12).toString("hex");
-	const temporary = resolve(path, `../.${basename(path)}.${process.pid}.${nonce}.tmp`);
-	try {
-		writeFileSync(temporary, content, { encoding: "utf8", flag: "wx", mode: 0o644 });
-		renameSync(temporary, path);
-	} finally {
-		rmSync(temporary, { force: true });
-	}
-}
-
 export function buildProject(
 	options: { config?: string; check?: boolean; cwd?: string; releaseProfile?: string } = {},
 ): BuildResult {
@@ -62,7 +51,9 @@ export function buildProject(
 		return { catalogPath, typesPath, catalogDigest: project.artifact.catalogDigest, checked: true };
 	}
 	mkdirSync(outputDirectory, { recursive: true });
-	atomicWrite(catalogPath, catalogBytes);
-	atomicWrite(typesPath, typeBytes);
+	replaceGeneratedPair([
+		{ path: catalogPath, content: catalogBytes },
+		{ path: typesPath, content: typeBytes },
+	]);
 	return { catalogPath, typesPath, catalogDigest: project.artifact.catalogDigest, checked: false };
 }

@@ -32,7 +32,6 @@ function definition(): CanonicalContextDefinition {
 function artifact() {
 	return compileCatalog([definition()], {
 		releaseProfile: "production",
-		aliases: { "codingAgent.roleInstructions": "codingAgent.role-instructions" },
 		provenance: {
 			configPath: "s11t.config.toml",
 			sourceFiles: ["contexts/codingAgent/role-instructions.context.toml"],
@@ -102,26 +101,35 @@ function errorDetails(action: () => unknown): { code: string; path: Array<string
 }
 
 describe("catalog", () => {
-	it("uses canonical dot keys while preserving a one-hop alias", () => {
+	it("uses canonical dot keys in invocations and manifests", () => {
 		const catalog = createCatalog(artifact());
 		const invocation = catalog.bind({ instructionLocale: "ja-JP" })(
-			"codingAgent.roleInstructions",
+			"codingAgent.role-instructions",
 			{},
 		);
 		expect(invocation.content.text).toBe("日本語\n");
 		expect(invocation.manifest).toEqual(
 			expect.objectContaining({
-				requestedKey: "codingAgent.roleInstructions",
-				resolvedKey: "codingAgent.role-instructions",
-				aliasUsed: true,
+				key: "codingAgent.role-instructions",
 			}),
 		);
-		expect(catalog.listAliases()).toEqual({
-			"codingAgent.roleInstructions": "codingAgent.role-instructions",
-		});
 	});
 
-	it("lists and describes immutable contexts through canonical keys and aliases", () => {
+	it("rejects placeholder mismatches in canonical definitions", () => {
+		const input = definitionWithValue();
+		input.sections[0]!.locales["en-US"] = "Value";
+		expect(() =>
+			compileCatalog([input], {
+				releaseProfile: "production",
+				provenance: {
+					configPath: "s11t.config.toml",
+					sourceFiles: ["contexts/value.context.toml"],
+				},
+			}),
+		).toThrow(/Translation placeholders must match/);
+	});
+
+	it("lists and describes immutable contexts through canonical keys", () => {
 		const catalog = createCatalog(artifact());
 		const descriptions = catalog.list();
 		expect(descriptions).toEqual([
@@ -131,7 +139,6 @@ describe("catalog", () => {
 			}),
 		]);
 		expect(catalog.describe("codingAgent.role-instructions")).toBe(descriptions[0]);
-		expect(catalog.describe("codingAgent.roleInstructions")).toBe(descriptions[0]);
 		expect(Object.isFrozen(descriptions)).toBe(true);
 		expect(errorCode(() => catalog.describe("missing.context"))).toBe("S11T_CONTEXT_NOT_FOUND");
 	});
@@ -202,10 +209,29 @@ describe("catalog", () => {
 		expect(reads).toBe(0);
 	});
 
-	it("rejects artifact and alias tampering", () => {
+	it("rejects artifact tampering", () => {
 		const input = artifact();
-		input.aliases["codingAgent.roleInstructions"] = "missing.key";
+		input.contexts["codingAgent.role-instructions"]!.key = "missing.key";
 		expect(errorCode(() => createCatalog(input))).toBe("S11T_ARTIFACT_INVALID");
+	});
+
+	it("rejects placeholder mismatches in compiled artifacts before digest validation", () => {
+		const input = compileCatalog([definitionWithValue()], {
+			releaseProfile: "production",
+			provenance: {
+				configPath: "s11t.config.toml",
+				sourceFiles: ["contexts/value.context.toml"],
+			},
+		});
+		input.contexts["codingAgent.role-instructions"]!.locales["en-US"]!.sections[0]!.segments = [
+			{ type: "literal", value: "Value" },
+		];
+		expect(() => createCatalog(input)).toThrowError(
+			expect.objectContaining<S11tError>({
+				code: "S11T_ARTIFACT_INVALID",
+				message: "Translation placeholders must match the source locale",
+			}),
+		);
 	});
 
 	it("delimits and escapes untrusted values and exposes a verifiable rendered hash", () => {
@@ -234,16 +260,12 @@ describe("catalog", () => {
 		);
 		expect(invocation.content.text).not.toContain("</S11T_DELIMITED_CONTEXT><script>");
 		expect(invocation.content.text).toContain("\\u003c");
-		expect(invocation.manifest).toMatchObject({
-			artifactSchemaVersion: 1,
-			renderingContract: "delimited-context",
-		});
 		expect(verifyRenderedHash(invocation.content.text, invocation.manifest.renderedHash)).toBe(
 			true,
 		);
 	});
 
-	it("returns equivalent immutable text renderers for canonical keys and aliases", () => {
+	it("returns equivalent immutable text renderers for canonical keys", () => {
 		const catalog = createCatalog(artifact());
 		const invocation = catalog.bind({ instructionLocale: "ja-JP" });
 		const bound = catalog.bindText({ instructionLocale: "ja-JP" });
@@ -254,7 +276,6 @@ describe("catalog", () => {
 		expect(bound.byKey["codingAgent.role-instructions"]({})).toBe(
 			bound.p("codingAgent.role-instructions", {}),
 		);
-		expect(bound.byKey["codingAgent.roleInstructions"]({})).toBe("日本語\n");
 		expect(Object.isFrozen(bound)).toBe(true);
 		expect(Object.isFrozen(bound.p)).toBe(true);
 		expect(Object.isFrozen(bound.byKey)).toBe(true);
@@ -299,7 +320,7 @@ describe("catalog", () => {
 		expect(audit.renderTrace.map(({ index, via, manifest }) => ({
 			index,
 			via,
-			key: manifest.requestedKey,
+			key: manifest.key,
 		}))).toEqual([
 			{ index: 0, via: "p", key: "codingAgent.role-instructions" },
 			{ index: 1, via: "byKey", key: "codingAgent.role-instructions" },

@@ -48,21 +48,21 @@ describe("generated type contract", () => {
 		expect(first).not.toMatch(/\/Users\//);
 	});
 
-	it("emits exact empty values for variable-free contexts and aliases", () => {
+	it("emits exact empty values for variable-free contexts", () => {
 		const input = definition();
 		input.key = "example.empty";
 		input.variables = {};
 		input.sections[0]!.locales = { "en-US": "Ready" };
 		const artifact = compileCatalog([input], {
 			releaseProfile: "development",
-			aliases: { "example.emptyAlias": "example.empty" },
 			provenance: { configPath: "s11t.config.toml", sourceFiles: ["contexts/empty.context.toml"] },
 		});
 
 		const generated = emitTypes(artifact);
 		expect(generated).toContain('"example.empty": Record<string, never>;');
-		expect(generated).toContain('"example.emptyAlias": Record<string, never>;');
 		expect(generated).not.toContain('"example.empty": {};');
+		expect(generated).not.toContain("SystemContextAlias");
+		expect(generated).not.toContain("CanonicalSystemContextKey");
 		expect(generated).not.toContain("JsonValue");
 	});
 });

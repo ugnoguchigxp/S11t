@@ -1,7 +1,7 @@
 # S11t authoring format
 
 Each `.context.toml` file contains content and variable declarations. Project-wide ownership, source
-locale, release locale policy, reusable variable profiles, and aliases live in `s11t.config.toml`.
+locale, release locale policy, and reusable variable profiles live in `s11t.config.toml`.
 
 ```toml
 source_dir = "contexts"
@@ -21,8 +21,7 @@ required_locales = ["$source"]
 ```
 
 A file may use root `text` plus `translations`, or an ordered `sections` array. It must not use both
-forms. Its canonical dot key is derived from the source-relative path unless an explicit dot `key` is
-present.
+forms. Its canonical dot key is always derived from the source-relative path.
 
 ```toml
 text = "Task: [[taskGoal]]"
@@ -37,8 +36,9 @@ encoding = "json-string"
 text = "タスク: [[taskGoal]]"
 ```
 
-All sections define the same locale set. Placeholders must be declared and every declared variable must
-be used. Untrusted variables require `delimited-context` placement and a non-raw encoding.
+All sections define the same locale set. Each translation must use the same placeholder-name set as the
+source locale for that section. Placeholders must be declared and every declared variable must be used.
+Untrusted variables require `delimited-context` placement and a non-raw encoding.
 
 The machine-readable source contract is
 [`schemas/s11t-authoring.schema.json`](../../schemas/s11t-authoring.schema.json). Cross-file policy and

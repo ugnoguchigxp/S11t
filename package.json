@@ -17,10 +17,11 @@
     "node": "^20.19.0 || ^22.0.0 || ^24.0.0"
   },
   "scripts": {
-    "build": "tsc -b --pretty false",
-    "clean": "tsc -b --clean",
+    "build": "tsc -b --pretty false && node scripts/bundle-packages.mjs",
+    "clean": "tsc -b --clean && node scripts/bundle-packages.mjs clean",
     "typecheck": "tsc -b --pretty false",
     "test": "vitest run",
+    "test:properties": "vitest run packages/runtime/tests/properties.test.ts packages/runtime/tests/artifact-schema.property.test.ts packages/cli/tests/toml-fuzz.test.ts",
     "test:coverage": "vitest run --coverage && pnpm check:critical-coverage",
     "check:critical-coverage": "node scripts/check-critical-coverage.mjs",
     "test:schema-drift": "vitest run packages/runtime/tests/artifact-schema.test.ts packages/cli/tests/authoring-json-schema.test.ts",
@@ -48,6 +49,7 @@
     "ajv": "8.20.0",
     "cross-spawn": "7.0.6",
     "esbuild": "0.28.1",
+    "fast-check": "4.9.0",
     "tar": "7.5.20",
     "typescript": "7.0.2",
     "vitest": "4.1.10"

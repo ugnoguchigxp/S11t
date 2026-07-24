@@ -6,23 +6,18 @@
   "additionalProperties": false,
   "required": [
     "format",
-    "schemaVersion",
     "compilerVersion",
     "releaseProfile",
     "policyDigest",
-    "renderingContract",
     "createdFrom",
     "contexts",
-    "aliases",
     "catalogDigest"
   ],
   "properties": {
     "format": { "const": "s11t.catalog" },
-    "schemaVersion": { "const": 1 },
     "compilerVersion": { "type": "string", "minLength": 1 },
     "releaseProfile": { "type": "string", "minLength": 1 },
     "policyDigest": { "$ref": "#/$defs/digest" },
-    "renderingContract": { "const": "delimited-context" },
     "createdFrom": {
       "type": "object",
       "additionalProperties": false,
@@ -40,11 +35,6 @@
       "propertyNames": { "$ref": "#/$defs/dotKey" },
       "additionalProperties": { "$ref": "#/$defs/context" }
     },
-    "aliases": {
-      "type": "object",
-      "propertyNames": { "$ref": "#/$defs/aliasKey" },
-      "additionalProperties": { "$ref": "#/$defs/dotKey" }
-    },
     "catalogDigest": { "$ref": "#/$defs/digest" }
   },
   "$defs": {
@@ -53,10 +43,6 @@
       "pattern": "^sha256:[0-9a-f]{64}$"
     },
     "dotKey": {
-      "type": "string",
-      "pattern": "^[A-Za-z][A-Za-z0-9_-]*(?:\\.[A-Za-z][A-Za-z0-9_-]*)*$"
-    },
-    "aliasKey": {
       "type": "string",
       "pattern": "^[A-Za-z][A-Za-z0-9_-]*(?:\\.[A-Za-z][A-Za-z0-9_-]*)*$"
     },

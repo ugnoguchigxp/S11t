@@ -21,6 +21,3 @@ type = "string"
 trust = "trusted"
 placement = "delimited-context"
 encoding = "raw"
-
-[key_aliases]
-"structuredGeneration.repairAlias" = "structuredGeneration.repair"

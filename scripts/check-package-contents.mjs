@@ -14,9 +14,6 @@ const requiredRootFiles = [
 	"README.md",
 	"LICENSE",
 	"NOTICE",
-	"SECURITY.md",
-	"CONTRIBUTING.md",
-	"CHANGELOG.md",
 ];
 const expectedPackageNames = ["@s11t/runtime", "@s11t/cli"];
 const expectedRepositoryUrl = "git+https://github.com/ugnoguchigxp/S11t.git";
@@ -129,10 +126,6 @@ async function inspectPackage(entry) {
 		if (packageJson.name !== entry.name || packageJson.version !== entry.version) {
 			throw new Error(`${entry.name} packed manifest identity does not match package.json`);
 		}
-		const changelog = readFileSync(resolve(packageRoot, "CHANGELOG.md"), "utf8").replaceAll("\r\n", "\n");
-		if (!changelog.includes(`## ${entry.version}\n`)) {
-			throw new Error(`${entry.name} changelog does not contain version ${entry.version}`);
-		}
 		if (packageJson.license !== "Apache-2.0") throw new Error(`${entry.name} has no Apache-2.0 license metadata`);
 		if (
 			packageJson.repository?.type !== "git" ||
@@ -199,7 +192,7 @@ async function inspectPackage(entry) {
 	}
 }
 
-if (manifest.schemaVersion !== 1 || !Array.isArray(manifest.packages) || manifest.packages.length !== 2) {
+if (!Array.isArray(manifest.packages) || manifest.packages.length !== 2) {
 	throw new Error("Package manifest must contain runtime and CLI tarballs");
 }
 if (

@@ -1,16 +1,14 @@
 # S11t catalog artifact
 
-The compiler emits one deterministic `s11t.catalog` JSON format. Its serialized `schemaVersion` is `1`;
-this marker exists only to reject future incompatible formats and does not select among implementations.
+The compiler emits one deterministic `s11t.catalog` JSON format. There are no legacy format variants
+or version-selection branches.
 
 The artifact contains:
 
 - compiler and release-profile identity;
 - policy and catalog digests;
-- the `delimited-context` rendering contract;
 - relative source provenance;
-- canonical dot-key contexts;
-- optional one-hop dot-key aliases.
+- canonical dot-key contexts.
 
 Each context records owner, source and required locales, variables, compiled locale sections, definition
 hash, locale artifact hashes, and release digest. Runtime loading validates structure, cross-field
@@ -39,3 +37,6 @@ compile-time error.
 Definition, artifact, release, policy, catalog, and rendered-text hashes use separate domain separators
 and canonical JSON where applicable. Source paths do not affect catalog identity. Golden vectors in
 `packages/runtime/tests/golden/hash.json` freeze the contract across supported Node.js releases.
+
+Artifact compatibility, version mixing, deprecation, and migration requirements are defined in the
+[compatibility policy](./compatibility.md).

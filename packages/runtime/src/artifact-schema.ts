@@ -245,21 +245,16 @@ export function assertCatalogArtifact(value: unknown): asserts value is S11tCata
 		object,
 		[
 			"format",
-			"schemaVersion",
 			"compilerVersion",
 			"releaseProfile",
 			"policyDigest",
-			"renderingContract",
 			"createdFrom",
 			"contexts",
-			"aliases",
 			"catalogDigest",
 		],
 		[],
 	);
 	literal(object.format, "s11t.catalog", ["format"]);
-	literal(object.schemaVersion, 1, ["schemaVersion"]);
-	literal(object.renderingContract, "delimited-context", ["renderingContract"]);
 	nonEmptyString(object.compilerVersion, ["compilerVersion"]);
 	nonEmptyString(object.releaseProfile, ["releaseProfile"]);
 	digest(object.policyDigest, ["policyDigest"]);
@@ -274,16 +269,6 @@ export function assertCatalogArtifact(value: unknown): asserts value is S11tCata
 	for (const [key, context] of Object.entries(contexts)) {
 		if (!DOT_KEY_PATTERN.test(key)) fail(["contexts", key], "a dot context key");
 		validateContext(context, ["contexts", key]);
-	}
-	const aliases = record(object.aliases, ["aliases"]);
-	for (const [alias, target] of Object.entries(aliases)) {
-		if (!DOT_KEY_PATTERN.test(alias)) {
-			fail(["aliases", alias], "a dot context key");
-		}
-		const canonical = nonEmptyString(target, ["aliases", alias]);
-		if (!DOT_KEY_PATTERN.test(canonical)) {
-			fail(["aliases", alias], "a canonical dot context key target");
-		}
 	}
 	digest(object.catalogDigest, ["catalogDigest"]);
 }

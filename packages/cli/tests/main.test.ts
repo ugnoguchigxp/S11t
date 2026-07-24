@@ -35,6 +35,39 @@ function execute(arguments_: string[], cwd: string) {
 }
 
 describe("CLI", () => {
+	it("prints version, command help, and shell completion", () => {
+		const directory = temporaryFixture("valid/content-first");
+		expect(execute(["--version"], directory)).toEqual({
+			code: 0,
+			stdout: "0.0.0\n",
+			stderr: "",
+		});
+		expect(execute(["version"], directory)).toEqual({
+			code: 0,
+			stdout: "0.0.0\n",
+			stderr: "",
+		});
+		expect(execute(["-V"], directory).stdout).toBe("0.0.0\n");
+		expect(execute(["version", "extra"], directory).code).toBe(2);
+		expect(execute(["help"], directory).stdout).toContain("SystemContext authoring");
+		expect(execute(["help", "unknown"], directory).code).toBe(2);
+		expect(execute(["help", "build", "extra"], directory).code).toBe(2);
+		expect(execute(["unknown", "--help"], directory).code).toBe(2);
+		const buildHelp = execute(["build", "--help"], directory);
+		expect(buildHelp).toMatchObject({ code: 0, stderr: "" });
+		expect(buildHelp.stdout).toContain("Usage: s11t build");
+		expect(buildHelp.stdout).toContain("--check");
+		expect(execute(["help", "inspect"], directory).stdout).toContain(
+			"s11t inspect --coverage",
+		);
+		for (const shell of ["bash", "zsh", "fish"]) {
+			const completion = execute(["completion", shell], directory);
+			expect(completion).toMatchObject({ code: 0, stderr: "" });
+			expect(completion.stdout).toContain("s11t");
+		}
+		expect(execute(["completion", "powershell"], directory).code).toBe(2);
+	});
+
 	it("lints valid sources and emits machine-readable invalid diagnostics", () => {
 		const validDirectory = temporaryFixture("valid/content-first");
 		const valid = execute(["lint", "--release-profile", "production"], validDirectory);

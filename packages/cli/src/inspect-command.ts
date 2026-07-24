@@ -7,7 +7,6 @@ const LOCALE_PATTERN = /^[A-Za-z]{2,8}(?:-[A-Za-z0-9]{1,8})*$/;
 export type CoverageStatus = "direct" | "fallback" | "missing";
 
 export type LocaleCoverageResult = {
-	schemaVersion: 1;
 	releaseProfile: string;
 	sourceLocale: string;
 	requestedLocale: string;
@@ -108,7 +107,6 @@ export function inspectCoverage(options: {
 	missing.sort();
 	for (const keys of Object.values(resolvedByLocale)) keys.sort();
 	return {
-		schemaVersion: 1,
 		releaseProfile: project.releaseProfile,
 		sourceLocale: project.config.authoring.sourceLocale,
 		requestedLocale: options.locale,
@@ -132,12 +130,7 @@ export function inspectContext(
 	options: { config?: string; locale?: string; cwd?: string; releaseProfile?: string; resolved?: boolean } = {},
 ): unknown {
 	const project = compileProject(options.config, options.cwd, options.releaseProfile);
-	const resolvedKey = Object.hasOwn(project.artifact.contexts, key)
-		? key
-		: Object.hasOwn(project.artifact.aliases, key)
-			? project.artifact.aliases[key]
-			: undefined;
-	if (resolvedKey === undefined) {
+	if (!Object.hasOwn(project.artifact.contexts, key)) {
 		const diagnostic: S11tDiagnostic = {
 			code: "S11T_CONTEXT_NOT_FOUND",
 			severity: "error",
@@ -147,14 +140,12 @@ export function inspectContext(
 		};
 		throw new S11tDiagnosticError([diagnostic]);
 	}
-	const context = project.artifact.contexts[resolvedKey];
-	if (context === undefined) throw new Error(`Resolved context is missing: ${resolvedKey}`);
+	const context = project.artifact.contexts[key];
+	if (context === undefined) throw new Error(`Context is missing: ${key}`);
 	if (options.resolved === true) {
-		const document = project.documents.find((candidate) => candidate.definition.key === resolvedKey)!;
+		const document = project.documents.find((candidate) => candidate.definition.key === key)!;
 		return {
 			key: context.key,
-			requestedKey: key,
-			aliasUsed: key !== resolvedKey,
 			owner: context.owner,
 			contentKind: context.contentKind,
 			sourceLocale: context.sourceLocale,
@@ -175,13 +166,12 @@ export function inspectContext(
 			severity: "error",
 			message: `Locale not found: ${locale}`,
 			file: project.configPath,
-			path: [resolvedKey, locale],
+			path: [key, locale],
 		};
 		throw new S11tDiagnosticError([diagnostic]);
 	}
 	return {
 		key: context.key,
-		requestedKey: key,
 		owner: context.owner,
 		locale,
 		definitionHash: context.definitionHash,
