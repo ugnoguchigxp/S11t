@@ -1,16 +1,16 @@
 {
-  "name": "s11t",
+  "name": "s11tnext-workspace",
   "version": "0.0.0",
   "private": true,
   "type": "module",
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/ugnoguchigxp/S11t.git"
+    "url": "git+https://github.com/ugnoguchigxp/s11tnext.git"
   },
-  "homepage": "https://github.com/ugnoguchigxp/S11t#readme",
+  "homepage": "https://github.com/ugnoguchigxp/s11tnext#readme",
   "bugs": {
-    "url": "https://github.com/ugnoguchigxp/S11t/issues"
+    "url": "https://github.com/ugnoguchigxp/s11tnext/issues"
   },
   "packageManager": "pnpm@10.24.0",
   "engines": {
@@ -39,11 +39,11 @@
     "test:packages": "pnpm pack:all && pnpm test:package-contents && pnpm test:consumer",
     "release:dry-run": "node scripts/release-dry-run.mjs",
     "deploy:nightworkers-canary": "node scripts/deploy-nightworkers-canary.mjs",
-    "verify": "pnpm check:versions && pnpm typecheck && pnpm test:coverage && pnpm build && pnpm test:type-fixtures && pnpm test:no-node-builtins && pnpm test:browser-bundle && pnpm exec s11t --help"
+    "verify": "pnpm check:versions && pnpm typecheck && pnpm test:coverage && pnpm build && pnpm test:type-fixtures && pnpm test:no-node-builtins && pnpm test:browser-bundle && pnpm exec s11tnext --help"
   },
   "devDependencies": {
     "@changesets/cli": "2.31.1",
-    "@s11t/cli": "workspace:*",
+    "s11tnext-cli": "workspace:*",
     "@types/node": "26.1.1",
     "@vitest/coverage-v8": "4.1.10",
     "ajv": "8.20.0",

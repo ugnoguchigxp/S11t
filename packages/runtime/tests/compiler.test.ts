@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { compileCatalog, tokenizeTemplate, type CanonicalContextDefinition } from "../src/compiler.js";
-import { S11tError } from "../src/diagnostics.js";
+import { S11tnextError } from "../src/diagnostics.js";
 
 function definition(): CanonicalContextDefinition {
 	return {
@@ -49,14 +49,14 @@ describe("pure compiler", () => {
 		const first = compileCatalog([definition()], {
 			releaseProfile: "production",
 			provenance: {
-				configPath: "s11t.config.toml",
+				configPath: "s11tnext.config.toml",
 				sourceFiles: ["contexts/greeting.context.toml"],
 			},
 		});
 		const second = compileCatalog([definition()], {
 			releaseProfile: "production",
 			provenance: {
-				configPath: "s11t.config.toml",
+				configPath: "s11tnext.config.toml",
 				sourceFiles: ["contexts/greeting.context.toml"],
 			},
 		});
@@ -80,7 +80,7 @@ describe("pure compiler", () => {
 		const artifact = compileCatalog([input], {
 			releaseProfile: "production",
 			provenance: {
-				configPath: "s11t.config.toml",
+				configPath: "s11tnext.config.toml",
 				sourceFiles: ["contexts/greeting.context.toml"],
 			},
 		});
@@ -95,7 +95,7 @@ describe("pure compiler", () => {
 		input.sections[0]!.locales["fr-FR"] = "Bonjour, [[name]].";
 		const artifact = compileCatalog([input], {
 			releaseProfile: "production",
-			provenance: { configPath: "s11t.config.toml", sourceFiles: ["contexts/greeting.context.toml"] },
+			provenance: { configPath: "s11tnext.config.toml", sourceFiles: ["contexts/greeting.context.toml"] },
 		});
 		expect(Object.keys(artifact.contexts["example.greeting"]!.locales)).toEqual([
 			"en-US",
@@ -111,11 +111,11 @@ describe("pure compiler", () => {
 			compileCatalog([input], {
 				releaseProfile: "production",
 				provenance: {
-					configPath: "s11t.config.toml",
+					configPath: "s11tnext.config.toml",
 					sourceFiles: ["contexts/greeting.context.toml"],
 				},
 			}),
-		).toThrowError(expect.objectContaining<S11tError>({ code: "S11T_ARTIFACT_INVALID" }));
+		).toThrowError(expect.objectContaining<S11tnextError>({ code: "S11TNEXT_ARTIFACT_INVALID" }));
 	});
 
 	it("never emits an artifact with undeclared template variables", () => {
@@ -125,10 +125,10 @@ describe("pure compiler", () => {
 			compileCatalog([input], {
 				releaseProfile: "production",
 				provenance: {
-					configPath: "s11t.config.toml",
+					configPath: "s11tnext.config.toml",
 					sourceFiles: ["contexts/greeting.context.toml"],
 				},
 			}),
-		).toThrowError(expect.objectContaining<S11tError>({ code: "S11T_ARTIFACT_INVALID" }));
+		).toThrowError(expect.objectContaining<S11tnextError>({ code: "S11TNEXT_ARTIFACT_INVALID" }));
 	});
 });

@@ -5,35 +5,35 @@ import type { CanonicalContextDefinition } from "./canonical-definition.js";
 import { canonicalJson } from "./canonical-json.js";
 import type {
 	JsonValue,
-	S11tCompiledSection,
+	S11tnextCompiledSection,
 } from "./types.js";
 
 const HASH_DOMAINS = {
-	definition: "s11t.definition",
-	artifact: "s11t.artifact",
-	release: "s11t.release",
-	policy: "s11t.policy",
-	catalog: "s11t.catalog",
-	rendered: "s11t.rendered",
+	definition: "s11tnext.definition",
+	artifact: "s11tnext.artifact",
+	release: "s11tnext.release",
+	policy: "s11tnext.policy",
+	catalog: "s11tnext.catalog",
+	rendered: "s11tnext.rendered",
 } as const;
 
-export type S11tDigest = `sha256:${string}`;
+export type S11tnextDigest = `sha256:${string}`;
 
 function compareCodeUnits(left: string, right: string): number {
 	return left < right ? -1 : left > right ? 1 : 0;
 }
 
-export function sha256Utf8(value: string): S11tDigest {
+export function sha256Utf8(value: string): S11tnextDigest {
 	return `sha256:${bytesToHex(sha256(utf8ToBytes(value)))}`;
 }
 
-function hashCanonical(domain: string, value: JsonValue): S11tDigest {
+function hashCanonical(domain: string, value: JsonValue): S11tnextDigest {
 	return sha256Utf8(`${domain}\0${canonicalJson(value)}`);
 }
 
 export function hashDefinition(
 	value: CanonicalContextDefinition,
-): S11tDigest {
+): S11tnextDigest {
 	return hashCanonical(HASH_DOMAINS.definition, {
 		key: value.key,
 		owner: value.owner,
@@ -48,8 +48,8 @@ export function hashDefinition(
 export function hashArtifact(value: {
 	key: string;
 	locale: string;
-	sections: S11tCompiledSection[];
-}): S11tDigest {
+	sections: S11tnextCompiledSection[];
+}): S11tnextDigest {
 	return hashCanonical(HASH_DOMAINS.artifact, value);
 }
 
@@ -58,7 +58,7 @@ export function hashRelease(value: {
 	compilerVersion: string;
 	definitionHash: string;
 	artifactHashes: Record<string, string>;
-}): S11tDigest {
+}): S11tnextDigest {
 	return hashCanonical(HASH_DOMAINS.release, {
 		key: value.key,
 		compilerVersion: value.compilerVersion,
@@ -72,7 +72,7 @@ export function hashRelease(value: {
 export function hashPolicy(value: {
 	releaseProfile: string;
 	requiredLocales: Record<string, string[]>;
-}): S11tDigest {
+}): S11tnextDigest {
 	return hashCanonical(HASH_DOMAINS.policy, {
 		releaseProfile: value.releaseProfile,
 		requiredLocales: Object.entries(value.requiredLocales).sort(([left], [right]) =>
@@ -85,7 +85,7 @@ export function hashCatalog(value: {
 	compilerVersion: string;
 	policyDigest: string;
 	releaseDigests: Record<string, string>;
-}): S11tDigest {
+}): S11tnextDigest {
 	return hashCanonical(HASH_DOMAINS.catalog, {
 		compilerVersion: value.compilerVersion,
 		policyDigest: value.policyDigest,
@@ -95,7 +95,7 @@ export function hashCatalog(value: {
 	});
 }
 
-export function hashRendered(text: string): S11tDigest {
+export function hashRendered(text: string): S11tnextDigest {
 	return sha256Utf8(`${HASH_DOMAINS.rendered}\0${text}`);
 }
 

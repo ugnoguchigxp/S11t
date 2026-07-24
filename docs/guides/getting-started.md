@@ -1,32 +1,32 @@
 # Getting started
 
-S11t compiles content-first TOML into deterministic JSON and a typed runtime factory. The host
+S11tnext compiles content-first TOML into deterministic JSON and a typed runtime factory. The host
 application loads the artifact and chooses the instruction locale at its request or run boundary.
 
 ## Install and scripts
 
 ```sh
-npm install @s11t/runtime
-npm install --save-dev @s11t/cli
+npm install s11tnext
+npm install --save-dev s11tnext-cli
 ```
 
 ```json
 {
   "scripts": {
-    "s11t:lint": "s11t lint --release-profile development",
-    "s11t:build": "s11t build --release-profile development",
-    "s11t:check": "s11t build --check --release-profile development"
+    "s11tnext:lint": "s11tnext lint --release-profile development",
+    "s11tnext:build": "s11tnext build --release-profile development",
+    "s11tnext:check": "s11tnext build --check --release-profile development"
   }
 }
 ```
 
 ## Configure a catalog
 
-Create `s11t.config.toml`:
+Create `s11tnext.config.toml`:
 
 ```toml
 source_dir = "contexts"
-out_dir = ".s11t"
+out_dir = ".s11tnext"
 
 [authoring]
 source_locale = "ja-JP"
@@ -67,22 +67,22 @@ The path produces the canonical key `codingAgent.task`. Untrusted values must us
 ## Validate and build
 
 ```sh
-npm run s11t:lint
-npm run s11t:build
-npm run s11t:check
+npm run s11tnext:lint
+npm run s11tnext:build
+npm run s11tnext:check
 ```
 
-The build writes `.s11t/catalog.json` and `.s11t/catalog.generated.ts`. Both files are staged before
+The build writes `.s11tnext/catalog.json` and `.s11tnext/catalog.generated.ts`. Both files are staged before
 installation and the previous pair is restored if installation fails. Commit them together.
-`--check` performs no writes and reports `S11T_BUILD_STALE` when either output differs.
+`--check` performs no writes and reports `S11TNEXT_BUILD_STALE` when either output differs.
 
 ## Bind one request
 
 ```ts
 import { readFile } from "node:fs/promises";
-import { createAppCatalog } from "./.s11t/catalog.generated.js";
+import { createAppCatalog } from "./.s11tnext/catalog.generated.js";
 
-const artifact: unknown = JSON.parse(await readFile(".s11t/catalog.json", "utf8"));
+const artifact: unknown = JSON.parse(await readFile(".s11tnext/catalog.json", "utf8"));
 const catalog = createAppCatalog(artifact);
 const requestCatalog = catalog.bindRequest({
   instructionLocale: request.settings.instructionLocale,
@@ -104,20 +104,20 @@ should re-read a top-level locale setting on each call.
 Inspect staged locale rollout without changing release requirements:
 
 ```sh
-s11t inspect --coverage --locale en-US --fallback-locale ja-JP \
+s11tnext inspect --coverage --locale en-US --fallback-locale ja-JP \
   --release-profile development --format json
 ```
 
-S11t does not call an LLM provider and does not own authorization, retries, tool enforcement, or trace
+S11tnext does not call an LLM provider and does not own authorization, retries, tool enforcement, or trace
 persistence. See [backend integration](./backend-integration.md) and
 [trust boundaries](./trust-boundaries.md).
 
 For command-specific help and optional shell completion:
 
 ```sh
-s11t help build
-s11t completion zsh
-s11t --version
+s11tnext help build
+s11tnext completion zsh
+s11tnext --version
 ```
 
 See [troubleshooting](./troubleshooting.md) for common installation, build, locale, and diagnostic

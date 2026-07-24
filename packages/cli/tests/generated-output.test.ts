@@ -24,7 +24,7 @@ function fixture(): {
 	catalogPath: string;
 	typesPath: string;
 } {
-	const directory = mkdtempSync(join(tmpdir(), "s11t-output-"));
+	const directory = mkdtempSync(join(tmpdir(), "s11tnext-output-"));
 	temporaryDirectories.push(directory);
 	const catalogPath = join(directory, "catalog.json");
 	const typesPath = join(directory, "catalog.generated.ts");

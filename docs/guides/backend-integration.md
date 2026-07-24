@@ -15,7 +15,7 @@ const p = catalog.bind({
 
 `p()` is synchronous. It validates missing, extra, and invalid runtime values; renders sections in source order; and returns immutable content plus a manifest. Runtime values and rendered text are not copied into the manifest.
 
-S11t does not call an LLM provider and does not own authorization, retries, tool enforcement, or trace persistence. Pass `invocation.content.text` and the immutable manifest to those application-owned layers.
+S11tnext does not call an LLM provider and does not own authorization, retries, tool enforcement, or trace persistence. Pass `invocation.content.text` and the immutable manifest to those application-owned layers.
 
 For text-only composition with one locale snapshot, bind once at the start of the request or run:
 

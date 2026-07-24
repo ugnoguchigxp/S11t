@@ -5,13 +5,13 @@ import {
 	renderSection,
 	valuesRecord,
 } from "../src/catalog-shared.js";
-import { S11tError } from "../src/diagnostics.js";
+import { S11tnextError } from "../src/diagnostics.js";
 
 describe("catalog internal guards", () => {
 	it("reports digest mismatches with the stable error contract", () => {
 		expect(() => digestMismatch(["catalogDigest"], "Catalog")).toThrowError(
-			expect.objectContaining<S11tError>({
-				code: "S11T_ARTIFACT_DIGEST_MISMATCH",
+			expect.objectContaining<S11tnextError>({
+				code: "S11TNEXT_ARTIFACT_DIGEST_MISMATCH",
 				path: ["catalogDigest"],
 			}),
 		);
@@ -21,7 +21,7 @@ describe("catalog internal guards", () => {
 		expect(valuesRecord(Object.create(null))).toEqual({});
 		for (const value of [null, [], new Date()]) {
 			expect(() => valuesRecord(value)).toThrowError(
-				expect.objectContaining<S11tError>({ code: "S11T_VALUE_INVALID" }),
+				expect.objectContaining<S11tnextError>({ code: "S11TNEXT_VALUE_INVALID" }),
 			);
 		}
 	});
@@ -32,6 +32,6 @@ describe("catalog internal guards", () => {
 				{ segments: [{ type: "variable", name: "missing" }] },
 				{},
 			),
-		).toThrowError(expect.objectContaining<S11tError>({ code: "S11T_ARTIFACT_INVALID" }));
+		).toThrowError(expect.objectContaining<S11tnextError>({ code: "S11TNEXT_ARTIFACT_INVALID" }));
 	});
 });

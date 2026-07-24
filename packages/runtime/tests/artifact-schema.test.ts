@@ -27,12 +27,12 @@ function artifact() {
 	};
 	return compileCatalog([definition], {
 		releaseProfile: "development",
-		provenance: { configPath: "s11t.config.toml", sourceFiles: ["contexts/example.context.toml"] },
+		provenance: { configPath: "s11tnext.config.toml", sourceFiles: ["contexts/example.context.toml"] },
 	});
 }
 
 const schema = JSON.parse(
-	readFileSync(new URL("../../../schemas/s11t-artifact.schema.json", import.meta.url), "utf8"),
+	readFileSync(new URL("../../../schemas/s11tnext-artifact.schema.json", import.meta.url), "utf8"),
 ) as object;
 const validateJsonSchema = new Ajv2020({ strict: true }).compile(schema);
 

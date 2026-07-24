@@ -40,7 +40,7 @@ function artifact() {
 	return compileCatalog([definition], {
 		releaseProfile: "development",
 		provenance: {
-			configPath: "s11t.config.toml",
+			configPath: "s11tnext.config.toml",
 			sourceFiles: ["contexts/example.context.toml"],
 		},
 	});
@@ -48,7 +48,7 @@ function artifact() {
 
 const schema = JSON.parse(
 	readFileSync(
-		new URL("../../../schemas/s11t-artifact.schema.json", import.meta.url),
+		new URL("../../../schemas/s11tnext-artifact.schema.json", import.meta.url),
 		"utf8",
 	),
 ) as object;

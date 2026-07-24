@@ -1,6 +1,6 @@
 import { canonicalJson } from "./canonical-json.js";
-import { S11tError } from "./diagnostics.js";
-import type { JsonValue, S11tCompiledVariable } from "./types.js";
+import { S11tnextError } from "./diagnostics.js";
+import type { JsonValue, S11tnextCompiledVariable } from "./types.js";
 
 function isPlainObject(value: object): value is Record<string, unknown> {
 	const prototype = Object.getPrototypeOf(value) as unknown;
@@ -22,7 +22,7 @@ function snapshotJsonValueInternal(
 	}
 	if (Array.isArray(value)) {
 		if (ancestors.has(value)) {
-			throw new S11tError("S11T_VALUE_INVALID", "Cyclic JSON values are not supported", path);
+			throw new S11tnextError("S11TNEXT_VALUE_INVALID", "Cyclic JSON values are not supported", path);
 		}
 		ancestors.add(value);
 		try {
@@ -30,13 +30,13 @@ function snapshotJsonValueInternal(
 			for (let index = 0; index < value.length; index += 1) {
 				const descriptor = Object.getOwnPropertyDescriptor(value, index);
 				if (descriptor === undefined) {
-					throw new S11tError("S11T_VALUE_INVALID", "Sparse JSON arrays are not supported", [
+					throw new S11tnextError("S11TNEXT_VALUE_INVALID", "Sparse JSON arrays are not supported", [
 						...path,
 						index,
 					]);
 				}
 				if (!("value" in descriptor)) {
-					throw new S11tError("S11T_VALUE_INVALID", "JSON accessors are not supported", [
+					throw new S11tnextError("S11TNEXT_VALUE_INVALID", "JSON accessors are not supported", [
 						...path,
 						index,
 					]);
@@ -50,7 +50,7 @@ function snapshotJsonValueInternal(
 	}
 	if (typeof value === "object" && isPlainObject(value)) {
 		if (ancestors.has(value)) {
-			throw new S11tError("S11T_VALUE_INVALID", "Cyclic JSON values are not supported", path);
+			throw new S11tnextError("S11TNEXT_VALUE_INVALID", "Cyclic JSON values are not supported", path);
 		}
 		ancestors.add(value);
 		try {
@@ -58,7 +58,7 @@ function snapshotJsonValueInternal(
 			for (const key of Object.keys(value)) {
 				const descriptor = Object.getOwnPropertyDescriptor(value, key);
 				if (descriptor === undefined || !("value" in descriptor)) {
-					throw new S11tError("S11T_VALUE_INVALID", "JSON accessors are not supported", [
+					throw new S11tnextError("S11TNEXT_VALUE_INVALID", "JSON accessors are not supported", [
 						...path,
 						key,
 					]);
@@ -70,7 +70,7 @@ function snapshotJsonValueInternal(
 			ancestors.delete(value);
 		}
 	}
-	throw new S11tError("S11T_VALUE_INVALID", "Expected a JSON-compatible value", path);
+	throw new S11tnextError("S11TNEXT_VALUE_INVALID", "Expected a JSON-compatible value", path);
 }
 
 export function assertJsonValue(value: unknown, path: Array<string | number> = []): asserts value is JsonValue {
@@ -90,22 +90,22 @@ function escapeBoundaryCharacters(value: string): string {
 
 export function encodeValue(
 	value: unknown,
-	definition: S11tCompiledVariable,
+	definition: S11tnextCompiledVariable,
 	path: Array<string | number>,
 	options: { escapeBoundaryCharacters?: boolean } = {},
 ): string {
 	let jsonValue: JsonValue | undefined;
 	if (definition.type === "string" && typeof value !== "string") {
-		throw new S11tError("S11T_VALUE_INVALID", "Expected a string", path);
+		throw new S11tnextError("S11TNEXT_VALUE_INVALID", "Expected a string", path);
 	}
 	if (
 		definition.type === "number" &&
 		(typeof value !== "number" || !Number.isFinite(value))
 	) {
-		throw new S11tError("S11T_VALUE_INVALID", "Expected a finite number", path);
+		throw new S11tnextError("S11TNEXT_VALUE_INVALID", "Expected a finite number", path);
 	}
 	if (definition.type === "boolean" && typeof value !== "boolean") {
-		throw new S11tError("S11T_VALUE_INVALID", "Expected a boolean", path);
+		throw new S11tnextError("S11TNEXT_VALUE_INVALID", "Expected a boolean", path);
 	}
 	if (definition.type === "json") {
 		jsonValue = snapshotJsonValueInternal(value, path, new Set<object>());

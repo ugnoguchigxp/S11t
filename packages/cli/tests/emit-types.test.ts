@@ -1,7 +1,7 @@
 import {
 	compileCatalog,
 	type CanonicalContextDefinition,
-} from "@s11t/runtime/compiler";
+} from "s11tnext/compiler";
 import { describe, expect, it } from "vitest";
 
 import { emitTypes } from "../src/emit-types.js";
@@ -36,7 +36,7 @@ describe("generated type contract", () => {
 	it("maps every runtime variable type deterministically", () => {
 		const artifact = compileCatalog([definition()], {
 			releaseProfile: "test",
-			provenance: { configPath: "s11t.config.toml", sourceFiles: ["contexts/types.context.toml"] },
+			provenance: { configPath: "s11tnext.config.toml", sourceFiles: ["contexts/types.context.toml"] },
 		});
 		const first = emitTypes(artifact);
 		expect(emitTypes(artifact)).toBe(first);
@@ -44,7 +44,7 @@ describe("generated type contract", () => {
 		expect(first).toContain('"count": number;');
 		expect(first).toContain('"enabled": boolean;');
 		expect(first).toContain('"payload": JsonValue;');
-		expect(first).toContain('import { createCatalog } from "@s11t/runtime";');
+		expect(first).toContain('import { createCatalog } from "s11tnext";');
 		expect(first).not.toMatch(/\/Users\//);
 	});
 
@@ -55,7 +55,7 @@ describe("generated type contract", () => {
 		input.sections[0]!.locales = { "en-US": "Ready" };
 		const artifact = compileCatalog([input], {
 			releaseProfile: "development",
-			provenance: { configPath: "s11t.config.toml", sourceFiles: ["contexts/empty.context.toml"] },
+			provenance: { configPath: "s11tnext.config.toml", sourceFiles: ["contexts/empty.context.toml"] },
 		});
 
 		const generated = emitTypes(artifact);

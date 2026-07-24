@@ -1,5 +1,5 @@
-import { S11tError } from "./diagnostics.js";
-import type { S11tCatalogArtifact } from "./types.js";
+import { S11tnextError } from "./diagnostics.js";
+import type { S11tnextCatalogArtifact } from "./types.js";
 
 type Path = Array<string | number>;
 type UnknownRecord = Record<string, unknown>;
@@ -9,8 +9,8 @@ const LOCALE_PATTERN = /^[A-Za-z]{2,8}(?:-[A-Za-z0-9]{1,8})*$/;
 const VARIABLE_NAME_PATTERN = /^[A-Za-z][A-Za-z0-9_]*$/;
 
 function fail(path: Path, expected: string): never {
-	throw new S11tError(
-		"S11T_ARTIFACT_INVALID",
+	throw new S11tnextError(
+		"S11TNEXT_ARTIFACT_INVALID",
 		`Expected ${expected} at ${path.length === 0 ? "$" : path.join(".")}`,
 		path,
 	);
@@ -239,7 +239,7 @@ function validateContext(value: unknown, path: Path): void {
 	digest(object.releaseDigest, [...path, "releaseDigest"]);
 }
 
-export function assertCatalogArtifact(value: unknown): asserts value is S11tCatalogArtifact {
+export function assertCatalogArtifact(value: unknown): asserts value is S11tnextCatalogArtifact {
 	const object = record(value, []);
 	exactKeys(
 		object,
@@ -254,7 +254,7 @@ export function assertCatalogArtifact(value: unknown): asserts value is S11tCata
 		],
 		[],
 	);
-	literal(object.format, "s11t.catalog", ["format"]);
+	literal(object.format, "s11tnext.catalog", ["format"]);
 	nonEmptyString(object.compilerVersion, ["compilerVersion"]);
 	nonEmptyString(object.releaseProfile, ["releaseProfile"]);
 	digest(object.policyDigest, ["policyDigest"]);
@@ -273,12 +273,12 @@ export function assertCatalogArtifact(value: unknown): asserts value is S11tCata
 	digest(object.catalogDigest, ["catalogDigest"]);
 }
 
-export function isCatalogArtifact(value: unknown): value is S11tCatalogArtifact {
+export function isCatalogArtifact(value: unknown): value is S11tnextCatalogArtifact {
 	try {
 		assertCatalogArtifact(value);
 		return true;
 	} catch (error) {
-		if (error instanceof S11tError) return false;
+		if (error instanceof S11tnextError) return false;
 		throw error;
 	}
 }

@@ -1,6 +1,6 @@
 # Trust boundaries
 
-S11t protects the boundary between authored SystemContext instructions and values supplied at runtime.
+S11tnext protects the boundary between authored SystemContext instructions and values supplied at runtime.
 It does not determine whether a value is trustworthy; the host must classify each data source.
 
 ## Classify by origin
@@ -33,7 +33,7 @@ placement = "delimited-context"
 encoding = "json-value"
 ```
 
-S11t rejects `untrusted` plus `raw` in both authoring and runtime artifact validation. Do not relabel
+S11tnext rejects `untrusted` plus `raw` in both authoring and runtime artifact validation. Do not relabel
 provider or user data as `trusted` merely to bypass this failure.
 
 Every `untrusted` variable must use `delimited-context` placement and a non-raw encoding. The runtime
@@ -56,7 +56,7 @@ const invocation = p("reviewer.evaluate", {
 await provider.generate({ system: invocation.content.text });
 await auditStore.write({
   requestId: request.id,
-  s11t: invocation.manifest,
+  s11tnext: invocation.manifest,
 });
 ```
 

@@ -1,12 +1,12 @@
 import { readFileSync } from "node:fs";
 
-import { verifyRenderedHash } from "@s11t/runtime";
-import { COMPILER_VERSION, tokenizeTemplate } from "@s11t/runtime/compiler";
+import { verifyRenderedHash } from "s11tnext";
+import { COMPILER_VERSION, tokenizeTemplate } from "s11tnext/compiler";
 
-import { createAppCatalog } from "../.s11t/catalog.generated.js";
+import { createAppCatalog } from "../.s11tnext/catalog.generated.js";
 
 const artifact: unknown = JSON.parse(
-	readFileSync(new URL("../../.s11t/catalog.json", import.meta.url), "utf8"),
+	readFileSync(new URL("../../.s11tnext/catalog.json", import.meta.url), "utf8"),
 );
 const catalog = createAppCatalog(artifact);
 const request = catalog.bindRequest({ instructionLocale: "ja-JP" });

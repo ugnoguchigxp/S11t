@@ -1,26 +1,26 @@
 import type {
-	S11tSectionEnforcement,
-	S11tSectionKind,
-	S11tSectionSeverity,
-	S11tVariableEncoding,
-	S11tVariablePlacement,
-	S11tVariableTrust,
-	S11tVariableType,
+	S11tnextSectionEnforcement,
+	S11tnextSectionKind,
+	S11tnextSectionSeverity,
+	S11tnextVariableEncoding,
+	S11tnextVariablePlacement,
+	S11tnextVariableTrust,
+	S11tnextVariableType,
 } from "./types.js";
 
 export type CanonicalVariableDefinition = {
 	required: true;
-	type: S11tVariableType;
-	trust: S11tVariableTrust;
-	placement: S11tVariablePlacement;
-	encoding: S11tVariableEncoding;
+	type: S11tnextVariableType;
+	trust: S11tnextVariableTrust;
+	placement: S11tnextVariablePlacement;
+	encoding: S11tnextVariableEncoding;
 };
 
 export type CanonicalSectionDefinition = {
 	id: string;
-	kind: S11tSectionKind;
-	severity: S11tSectionSeverity;
-	enforcement: S11tSectionEnforcement;
+	kind: S11tnextSectionKind;
+	severity: S11tnextSectionSeverity;
+	enforcement: S11tnextSectionEnforcement;
 	optimizable: boolean;
 	locales: Record<string, string>;
 };

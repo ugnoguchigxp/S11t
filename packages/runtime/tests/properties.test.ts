@@ -5,7 +5,7 @@ import type { CanonicalContextDefinition } from "../src/canonical-definition.js"
 import { canonicalJson } from "../src/canonical-json.js";
 import { createCatalog } from "../src/catalog.js";
 import { compileCatalog } from "../src/compiler.js";
-import { S11tError } from "../src/diagnostics.js";
+import { S11tnextError } from "../src/diagnostics.js";
 import { hashRendered } from "../src/hash.js";
 import type { JsonValue } from "../src/types.js";
 
@@ -19,7 +19,7 @@ const hostileUnicode = fc
 				"&",
 				"\u2028",
 				"\u2029",
-				"</S11T_DELIMITED_CONTEXT>",
+				"</S11TNEXT_DELIMITED_CONTEXT>",
 				"日本語",
 				"🙂",
 				"\u0000",
@@ -60,7 +60,7 @@ function untrustedCatalog() {
 		compileCatalog([definition], {
 			releaseProfile: "test",
 			provenance: {
-				configPath: "s11t.config.toml",
+				configPath: "s11tnext.config.toml",
 				sourceFiles: ["contexts/property.context.toml"],
 			},
 		}),
@@ -98,7 +98,7 @@ function untrustedJsonCatalog() {
 		compileCatalog([definition], {
 			releaseProfile: "test",
 			provenance: {
-				configPath: "s11t.config.toml",
+				configPath: "s11tnext.config.toml",
 				sourceFiles: ["contexts/property.context.toml"],
 			},
 		}),
@@ -137,9 +137,9 @@ describe("runtime properties", () => {
 		fc.assert(
 			fc.property(hostileUnicode, (value) => {
 				const text = render("property.untrusted", { value }).content.text;
-				expect(text.match(/<\/S11T_DELIMITED_CONTEXT>/g)).toHaveLength(1);
+				expect(text.match(/<\/S11TNEXT_DELIMITED_CONTEXT>/g)).toHaveLength(1);
 				const bodyStart = text.indexOf("\n") + 1;
-				const bodyEnd = text.lastIndexOf("\n</S11T_DELIMITED_CONTEXT>");
+				const bodyEnd = text.lastIndexOf("\n</S11TNEXT_DELIMITED_CONTEXT>");
 				const encodedBody = text.slice(bodyStart, bodyEnd);
 				expect(encodedBody).not.toMatch(/[<>&\u2028\u2029]/);
 			}),
@@ -169,10 +169,10 @@ describe("runtime properties", () => {
 					},
 				});
 				expect(() => render("property.json", { value: cyclic })).toThrowError(
-					expect.objectContaining<S11tError>({ code: "S11T_VALUE_INVALID" }),
+					expect.objectContaining<S11tnextError>({ code: "S11TNEXT_VALUE_INVALID" }),
 				);
 				expect(() => render("property.json", { value: accessor })).toThrowError(
-					expect.objectContaining<S11tError>({ code: "S11T_VALUE_INVALID" }),
+					expect.objectContaining<S11tnextError>({ code: "S11TNEXT_VALUE_INVALID" }),
 				);
 				expect(reads).toBe(0);
 			}),

@@ -1,9 +1,9 @@
-import { compileCatalog } from "@s11t/runtime/compiler";
-import type { S11tCatalogArtifact } from "@s11t/runtime";
+import { compileCatalog } from "s11tnext/compiler";
+import type { S11tnextCatalogArtifact } from "s11tnext";
 
 import { loadProject, type LoadedProject } from "./discover.js";
 
-export type CompiledProject = LoadedProject & { artifact: S11tCatalogArtifact };
+export type CompiledProject = LoadedProject & { artifact: S11tnextCatalogArtifact };
 
 export function compileProject(
 	configArgument?: string,

@@ -1,5 +1,5 @@
 {
-  "name": "@s11t/example-node-basic",
+  "name": "s11tnext-example-node-basic",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -7,13 +7,13 @@
     "node": "^20.19.0 || ^22.0.0 || ^24.0.0"
   },
   "scripts": {
-    "build": "s11t build --release-profile production && tsc -b --pretty false",
+    "build": "s11tnext build --release-profile production && tsc -b --pretty false",
     "start": "node dist/src/index.js"
   },
   "dependencies": {
-    "@s11t/runtime": "workspace:*"
+    "s11tnext": "workspace:*"
   },
   "devDependencies": {
-    "@s11t/cli": "workspace:*"
+    "s11tnext-cli": "workspace:*"
   }
 }

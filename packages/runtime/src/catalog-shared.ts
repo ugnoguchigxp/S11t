@@ -1,4 +1,4 @@
-import { S11tError } from "./diagnostics.js";
+import { S11tnextError } from "./diagnostics.js";
 import type { JsonValue, TemplateSegment } from "./types.js";
 
 export function compareCodeUnits(left: string, right: string): number {
@@ -6,7 +6,7 @@ export function compareCodeUnits(left: string, right: string): number {
 }
 
 export function digestMismatch(path: Array<string | number>, label: string): never {
-	throw new S11tError("S11T_ARTIFACT_DIGEST_MISMATCH", `${label} digest mismatch`, path);
+	throw new S11tnextError("S11TNEXT_ARTIFACT_DIGEST_MISMATCH", `${label} digest mismatch`, path);
 }
 
 export function templateFromSegments(segments: TemplateSegment[]): string {
@@ -33,11 +33,11 @@ export function deepFreeze<T>(value: T): T {
 
 export function valuesRecord(value: unknown): Record<string, unknown> {
 	if (value === null || typeof value !== "object" || Array.isArray(value)) {
-		throw new S11tError("S11T_VALUE_INVALID", "Values must be an object", []);
+		throw new S11tnextError("S11TNEXT_VALUE_INVALID", "Values must be an object", []);
 	}
 	const prototype = Object.getPrototypeOf(value) as unknown;
 	if (prototype !== Object.prototype && prototype !== null) {
-		throw new S11tError("S11T_VALUE_INVALID", "Values must be a plain object", []);
+		throw new S11tnextError("S11TNEXT_VALUE_INVALID", "Values must be a plain object", []);
 	}
 	return value as Record<string, unknown>;
 }
@@ -50,7 +50,7 @@ export function renderSection(
 		.map((segment) => {
 			if (segment.type === "literal") return segment.value;
 			if (!Object.hasOwn(encodedValues, segment.name)) {
-				throw new S11tError("S11T_ARTIFACT_INVALID", "Variable segment is undeclared", [segment.name]);
+				throw new S11tnextError("S11TNEXT_ARTIFACT_INVALID", "Variable segment is undeclared", [segment.name]);
 			}
 			return encodedValues[segment.name]!;
 		})

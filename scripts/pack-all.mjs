@@ -18,8 +18,8 @@ const outputDirectory = resolve(repositoryRoot, ".artifacts/packages");
 const manifestPath = resolve(outputDirectory, "manifest.json");
 const pnpm = process.platform === "win32" ? "pnpm.cmd" : "pnpm";
 const packageDefinitions = [
-	{ name: "@s11t/runtime", directory: resolve(repositoryRoot, "packages/runtime") },
-	{ name: "@s11t/cli", directory: resolve(repositoryRoot, "packages/cli") },
+	{ name: "s11tnext", directory: resolve(repositoryRoot, "packages/runtime") },
+	{ name: "s11tnext-cli", directory: resolve(repositoryRoot, "packages/cli") },
 ];
 
 function run(command, arguments_, cwd) {

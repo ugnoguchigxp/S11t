@@ -9,14 +9,14 @@ import { join } from "node:path";
 import fc from "fast-check";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { S11tDiagnosticError } from "../src/diagnostics.js";
+import { S11tnextDiagnosticError } from "../src/diagnostics.js";
 import { loadToml } from "../src/toml-loader.js";
 
 let directory: string;
 let filePath: string;
 
 beforeAll(() => {
-	directory = mkdtempSync(join(tmpdir(), "s11t-toml-fuzz-"));
+	directory = mkdtempSync(join(tmpdir(), "s11tnext-toml-fuzz-"));
 	filePath = join(directory, "input.toml");
 });
 
@@ -69,10 +69,10 @@ describe("TOML fuzz properties", () => {
 			fc.property(malformedToml, (source) => {
 				writeFileSync(filePath, source);
 				expect(() => loadToml(filePath, "input.toml")).toThrowError(
-					expect.objectContaining<S11tDiagnosticError>({
+					expect.objectContaining<S11tnextDiagnosticError>({
 						diagnostics: [
 							expect.objectContaining({
-								code: "S11T_TOML_SYNTAX",
+								code: "S11TNEXT_TOML_SYNTAX",
 								file: "input.toml",
 							}),
 						],

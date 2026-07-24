@@ -1,23 +1,23 @@
-export type S11tErrorCode =
-	| "S11T_ARTIFACT_INVALID"
-	| "S11T_ARTIFACT_DIGEST_MISMATCH"
-	| "S11T_CONTEXT_NOT_FOUND"
-	| "S11T_LOCALE_NOT_FOUND"
-	| "S11T_VALUE_MISSING"
-	| "S11T_VALUE_EXTRA"
-	| "S11T_VALUE_INVALID";
+export type S11tnextErrorCode =
+	| "S11TNEXT_ARTIFACT_INVALID"
+	| "S11TNEXT_ARTIFACT_DIGEST_MISMATCH"
+	| "S11TNEXT_CONTEXT_NOT_FOUND"
+	| "S11TNEXT_LOCALE_NOT_FOUND"
+	| "S11TNEXT_VALUE_MISSING"
+	| "S11TNEXT_VALUE_EXTRA"
+	| "S11TNEXT_VALUE_INVALID";
 
-export class S11tError extends Error {
-	readonly code: S11tErrorCode;
+export class S11tnextError extends Error {
+	readonly code: S11tnextErrorCode;
 	readonly path: Array<string | number>;
 
 	constructor(
-		code: S11tErrorCode,
+		code: S11tnextErrorCode,
 		message: string,
 		path: Array<string | number> = [],
 	) {
 		super(message);
-		this.name = "S11tError";
+		this.name = "S11tnextError";
 		this.code = code;
 		this.path = [...path];
 	}

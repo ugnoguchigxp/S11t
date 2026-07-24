@@ -5,7 +5,7 @@ import { parse } from "smol-toml";
 import { describe, expect, it } from "vitest";
 
 const schema = JSON.parse(
-	readFileSync(new URL("../../../schemas/s11t-authoring.schema.json", import.meta.url), "utf8"),
+	readFileSync(new URL("../../../schemas/s11tnext-authoring.schema.json", import.meta.url), "utf8"),
 ) as object;
 const validate = new Ajv2020({ strict: true }).compile(schema);
 

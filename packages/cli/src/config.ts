@@ -1,18 +1,18 @@
-import type { CanonicalVariableDefinition } from "@s11t/runtime/compiler";
+import type { CanonicalVariableDefinition } from "s11tnext/compiler";
 
-import { S11tDiagnosticError, type S11tDiagnostic } from "./diagnostics.js";
+import { S11tnextDiagnosticError, type S11tnextDiagnostic } from "./diagnostics.js";
 
-export type S11tReleaseProfile = {
+export type S11tnextReleaseProfile = {
 	requiredLocales: string[];
 };
 
-export type S11tProjectConfig = {
+export type S11tnextProjectConfig = {
 	sourceDir: string;
 	outDir: string;
 	authoring: { sourceLocale: string };
 	governance: { requireOwner: boolean };
 	keyspaces: Record<string, { owner: string }>;
-	releaseProfiles: Record<string, S11tReleaseProfile>;
+	releaseProfiles: Record<string, S11tnextReleaseProfile>;
 	variableProfiles: Record<string, CanonicalVariableDefinition>;
 };
 
@@ -24,14 +24,14 @@ const DOT_KEY_PATTERN = /^[A-Za-z][A-Za-z0-9_-]*(?:\.[A-Za-z][A-Za-z0-9_-]*)*$/;
 const PROFILE_NAME_PATTERN = /^[A-Za-z][A-Za-z0-9_.-]*$/;
 
 function issue(file: string, message: string, path: Path): never {
-	const diagnostic: S11tDiagnostic = {
-		code: "S11T_CONFIG_INVALID",
+	const diagnostic: S11tnextDiagnostic = {
+		code: "S11TNEXT_CONFIG_INVALID",
 		severity: "error",
 		message,
 		file,
 		path,
 	};
-	throw new S11tDiagnosticError([diagnostic]);
+	throw new S11tnextDiagnosticError([diagnostic]);
 }
 
 function object(value: unknown, file: string, path: Path): UnknownRecord {
@@ -150,8 +150,8 @@ function parseVariableProfiles(
 
 export function parseProjectConfig(
 	input: unknown,
-	file = "s11t.config.toml",
-): S11tProjectConfig {
+	file = "s11tnext.config.toml",
+): S11tnextProjectConfig {
 	const source = object(input, file, []);
 	exactKeys(
 		source,
@@ -192,7 +192,7 @@ export function parseProjectConfig(
 	}
 
 	const releaseSource = object(source.release_profiles, file, ["release_profiles"]);
-	const releaseProfiles: Record<string, S11tReleaseProfile> = {};
+	const releaseProfiles: Record<string, S11tnextReleaseProfile> = {};
 	for (const [name, value] of Object.entries(releaseSource)) {
 		if (!PROFILE_NAME_PATTERN.test(name)) issue(file, "Invalid release profile name", ["release_profiles", name]);
 		const entry = object(value, file, ["release_profiles", name]);

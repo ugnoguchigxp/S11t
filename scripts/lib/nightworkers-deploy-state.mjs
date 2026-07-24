@@ -52,7 +52,7 @@ function snapshotTree(root) {
 
 export function backupManagedFiles(target, backupRoot) {
 	const files = ["package.json", "bun.lock"];
-	const vendorPath = resolve(target, "vendor/s11t");
+	const vendorPath = resolve(target, "vendor/s11tnext");
 	const vendorEntry = managedEntry(vendorPath);
 	if (vendorEntry?.isSymbolicLink() === true) {
 		throw new Error(`Unsupported managed symbolic link: ${vendorPath}`);
@@ -82,7 +82,7 @@ export function backupManagedFiles(target, backupRoot) {
 	}
 	if (state.vendorExists) {
 		mkdirSync(resolve(backupRoot, "vendor"), { recursive: true });
-		cpSync(resolve(target, "vendor/s11t"), resolve(backupRoot, "vendor/s11t"), {
+		cpSync(resolve(target, "vendor/s11tnext"), resolve(backupRoot, "vendor/s11tnext"), {
 			recursive: true,
 		});
 	}
@@ -106,20 +106,20 @@ export function assertManagedFilesRestored(target, state) {
 			throw new Error(`Rollback did not restore ${file} mode`);
 		}
 	}
-	const vendor = resolve(target, "vendor/s11t");
+	const vendor = resolve(target, "vendor/s11tnext");
 	if (existsSync(vendor) !== state.vendorExists) {
-		throw new Error("Rollback did not restore vendor/s11t presence");
+		throw new Error("Rollback did not restore vendor/s11tnext presence");
 	}
 	if (state.vendorExists) {
 		if (
 			state.vendorMode !== undefined &&
 			(statSync(vendor).mode & 0o777) !== state.vendorMode
 		) {
-			throw new Error("Rollback did not restore vendor/s11t mode");
+			throw new Error("Rollback did not restore vendor/s11tnext mode");
 		}
 		const actual = JSON.stringify(snapshotTree(vendor));
 		const expected = JSON.stringify(state.vendorSnapshot);
-		if (actual !== expected) throw new Error("Rollback did not restore vendor/s11t bytes");
+		if (actual !== expected) throw new Error("Rollback did not restore vendor/s11tnext bytes");
 	}
 }
 
@@ -132,10 +132,10 @@ export function restoreManagedFiles(target, backupRoot, state) {
 			if (expected.mode !== undefined) chmodSync(destination, expected.mode);
 		}
 	}
-	const vendor = resolve(target, "vendor/s11t");
+	const vendor = resolve(target, "vendor/s11tnext");
 	rmSync(vendor, { recursive: true, force: true });
 	if (state.vendorExists) {
-		cpSync(resolve(backupRoot, "vendor/s11t"), vendor, { recursive: true });
+		cpSync(resolve(backupRoot, "vendor/s11tnext"), vendor, { recursive: true });
 		if (process.platform !== "win32") {
 			for (const entry of [...state.vendorSnapshot].reverse()) {
 				if (entry.mode !== undefined) chmodSync(resolve(vendor, entry.path), entry.mode);

@@ -1,6 +1,6 @@
-# @s11t/runtime
+# s11tnext
 
-Portable S11t artifact contracts, deterministic compiler primitives, and the typed catalog API.
+Portable S11tnext artifact contracts, deterministic compiler primitives, and the typed catalog API.
 This package uses no Node.js builtins, filesystem APIs, process state, or TOML parsing.
 Supported Node.js releases are 20.19+, 22, and 24.
 
@@ -8,7 +8,7 @@ This package is in pre-release development and is not yet available from the npm
 command below applies after the first registry bootstrap.
 
 ```sh
-npm install @s11t/runtime
+npm install s11tnext
 ```
 
 Applications pass an artifact to `createCatalog()`—normally through a generated `createAppCatalog()`
@@ -39,5 +39,5 @@ The audit contains the final manifest and successful request-local renders in ca
 Untrusted variables require `delimited-context` placement and a non-raw encoding. Use `bind()` or
 `bindRequest()` on provider and audit paths so content and its immutable identity stay correlated.
 
-See the [complete guide](https://github.com/ugnoguchigxp/S11t/blob/main/docs/guides/getting-started.md)
-and [backend integration guide](https://github.com/ugnoguchigxp/S11t/blob/main/docs/guides/backend-integration.md).
+See the [complete guide](https://github.com/ugnoguchigxp/s11tnext/blob/main/docs/guides/getting-started.md)
+and [backend integration guide](https://github.com/ugnoguchigxp/s11tnext/blob/main/docs/guides/backend-integration.md).

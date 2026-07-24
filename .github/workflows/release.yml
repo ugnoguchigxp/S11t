@@ -85,8 +85,8 @@ jobs:
       - name: Require explicit stable release enablement
         if: inputs.channel == 'stable'
         env:
-          S11T_STABLE_RELEASE_ENABLED: ${{ vars.S11T_STABLE_RELEASE_ENABLED }}
-        run: test "$S11T_STABLE_RELEASE_ENABLED" = "true"
+          S11TNEXT_STABLE_RELEASE_ENABLED: ${{ vars.S11TNEXT_STABLE_RELEASE_ENABLED }}
+        run: test "$S11TNEXT_STABLE_RELEASE_ENABLED" = "true"
       - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
@@ -97,7 +97,7 @@ jobs:
       - name: Confirm bootstrap is creating brand-new packages
         if: inputs.channel == 'bootstrap'
         run: |
-          for PACKAGE in "@s11t/runtime" "@s11t/cli"; do
+          for PACKAGE in "s11tnext" "s11tnext-cli"; do
             if OUTPUT="$(npm view "$PACKAGE" version 2>&1)"; then
               echo "$PACKAGE already exists at version $OUTPUT" >&2
               exit 1
@@ -138,7 +138,7 @@ jobs:
           npm init --yes
           DIST_TAG="${{ inputs.channel == 'canary' && 'canary' || 'latest' }}"
           if [ "${{ inputs.channel }}" = "bootstrap" ]; then DIST_TAG="canary"; fi
-          npm install "@s11t/runtime@$DIST_TAG" "@s11t/cli@$DIST_TAG"
+          npm install "s11tnext@$DIST_TAG" "s11tnext-cli@$DIST_TAG"
           npm audit signatures
 
   github-release:
@@ -171,8 +171,8 @@ jobs:
           [[ "$VERSION" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]
           test "$VERSION" = "$CLI_VERSION"
           test "$(git rev-parse HEAD)" = "$RELEASE_REF"
-          test "$(npm view "@s11t/runtime@$VERSION" version)" = "$VERSION"
-          test "$(npm view "@s11t/cli@$VERSION" version)" = "$VERSION"
+          test "$(npm view "s11tnext@$VERSION" version)" = "$VERSION"
+          test "$(npm view "s11tnext-cli@$VERSION" version)" = "$VERSION"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
       - name: Create the immutable tag and GitHub Release
         env:
@@ -188,13 +188,13 @@ jobs:
           else
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git tag --annotate "$TAG" "$RELEASE_REF" --message "S11t $VERSION"
+            git tag --annotate "$TAG" "$RELEASE_REF" --message "S11tnext $VERSION"
             git push origin "refs/tags/$TAG"
           fi
           if ! gh release view "$TAG" >/dev/null 2>&1; then
             gh release create "$TAG" \
               --verify-tag \
               --target "$RELEASE_REF" \
-              --title "S11t $VERSION" \
+              --title "S11tnext $VERSION" \
               --generate-notes
           fi

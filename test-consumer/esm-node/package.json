@@ -1,10 +1,10 @@
 {
-  "name": "@s11t/test-consumer-esm-node",
+  "name": "s11tnext-test-consumer-esm-node",
   "version": "0.0.0",
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "s11t build --release-profile development && tsc -p tsconfig.json --pretty false",
+    "build": "s11tnext build --release-profile development && tsc -p tsconfig.json --pretty false",
     "start": "node dist/src/index.js"
   },
   "devDependencies": {

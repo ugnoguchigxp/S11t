@@ -1,6 +1,6 @@
-# S11t catalog artifact
+# S11tnext catalog artifact
 
-The compiler emits one deterministic `s11t.catalog` JSON format. There are no legacy format variants
+The compiler emits one deterministic `s11tnext.catalog` JSON format. There are no legacy format variants
 or version-selection branches.
 
 The artifact contains:
@@ -18,7 +18,7 @@ Every untrusted variable uses `delimited-context` placement and a non-raw encodi
 structural boundary and escapes closing-tag characters before interpolation.
 
 The machine-readable contract is
-[`schemas/s11t-artifact.schema.json`](../../schemas/s11t-artifact.schema.json).
+[`schemas/s11tnext-artifact.schema.json`](../../schemas/s11tnext-artifact.schema.json).
 
 ## Runtime binding
 

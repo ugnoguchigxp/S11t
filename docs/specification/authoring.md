@@ -1,11 +1,11 @@
-# S11t authoring format
+# S11tnext authoring format
 
 Each `.context.toml` file contains content and variable declarations. Project-wide ownership, source
-locale, release locale policy, and reusable variable profiles live in `s11t.config.toml`.
+locale, release locale policy, and reusable variable profiles live in `s11tnext.config.toml`.
 
 ```toml
 source_dir = "contexts"
-out_dir = ".s11t"
+out_dir = ".s11tnext"
 
 [authoring]
 source_locale = "ja-JP"
@@ -41,7 +41,7 @@ source locale for that section. Placeholders must be declared and every declared
 Untrusted variables require `delimited-context` placement and a non-raw encoding.
 
 The machine-readable source contract is
-[`schemas/s11t-authoring.schema.json`](../../schemas/s11t-authoring.schema.json). Cross-file policy and
+[`schemas/s11tnext-authoring.schema.json`](../../schemas/s11tnext-authoring.schema.json). Cross-file policy and
 reference rules are enforced by the CLI in addition to JSON Schema.
 
 All `lint`, `build`, and `inspect` operations require an explicit `--release-profile`.

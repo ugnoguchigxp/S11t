@@ -9,17 +9,17 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { createCatalog } from "@s11t/runtime";
+import { createCatalog } from "s11tnext";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { buildProject } from "../src/build-command.js";
-import { S11tDiagnosticError } from "../src/diagnostics.js";
+import { S11tnextDiagnosticError } from "../src/diagnostics.js";
 import { inspectContext } from "../src/inspect-command.js";
 
 const temporaryDirectories: string[] = [];
 
 function temporaryFixture(name = "valid/content-first"): string {
-	const directory = mkdtempSync(join(tmpdir(), "s11t-build-"));
+	const directory = mkdtempSync(join(tmpdir(), "s11tnext-build-"));
 	temporaryDirectories.push(directory);
 	cpSync(new URL(`../../../fixtures/${name}`, import.meta.url), directory, { recursive: true });
 	return directory;
@@ -52,8 +52,8 @@ describe("build command", () => {
 		const sourcePath = join(directory, "contexts/structuredGeneration/repair.context.toml");
 		writeFileSync(sourcePath, readFileSync(sourcePath, "utf8").replace("Repair", "Fix"));
 		expect(() => buildProject({ cwd: directory, releaseProfile: "production", check: true })).toThrowError(
-			expect.objectContaining<S11tDiagnosticError>({
-				diagnostics: [expect.objectContaining({ code: "S11T_BUILD_STALE" })],
+			expect.objectContaining<S11tnextDiagnosticError>({
+				diagnostics: [expect.objectContaining({ code: "S11TNEXT_BUILD_STALE" })],
 			}),
 		);
 		expect(readFileSync(result.catalogPath, "utf8")).toBe(before);
@@ -69,10 +69,10 @@ describe("build command", () => {
 			format: string;
 		};
 		expect(artifact).toMatchObject({
-			format: "s11t.catalog",
+			format: "s11tnext.catalog",
 		});
 		expect(readFileSync(result.typesPath, "utf8")).toContain(
-			'import { createCatalog } from "@s11t/runtime";',
+			'import { createCatalog } from "s11tnext";',
 		);
 		expect(() => createCatalog(artifact)).not.toThrow();
 		expect(
@@ -95,24 +95,24 @@ describe("build command", () => {
 		const beforeJson = readFileSync(result.catalogPath, "utf8");
 		const beforeTypes = readFileSync(result.typesPath, "utf8");
 		writeFileSync(join(directory, "contexts/broken.context.toml"), "text = [");
-		expect(() => buildProject({ cwd: directory, releaseProfile: "production" })).toThrow(S11tDiagnosticError);
+		expect(() => buildProject({ cwd: directory, releaseProfile: "production" })).toThrow(S11tnextDiagnosticError);
 		expect(readFileSync(result.catalogPath, "utf8")).toBe(beforeJson);
 		expect(readFileSync(result.typesPath, "utf8")).toBe(beforeTypes);
 	});
 
 	it.skipIf(process.platform === "win32")("rejects out_dir symlinks outside the project", () => {
 		const directory = temporaryFixture("valid/content-first");
-		const outside = mkdtempSync(join(tmpdir(), "s11t-build-outside-"));
+		const outside = mkdtempSync(join(tmpdir(), "s11tnext-build-outside-"));
 		temporaryDirectories.push(outside);
 		symlinkSync(outside, join(directory, "linked-output"), "dir");
-		const configPath = join(directory, "s11t.config.toml");
+		const configPath = join(directory, "s11tnext.config.toml");
 		writeFileSync(
 			configPath,
-			readFileSync(configPath, "utf8").replace('out_dir = ".s11t"', 'out_dir = "linked-output"'),
+			readFileSync(configPath, "utf8").replace('out_dir = ".s11tnext"', 'out_dir = "linked-output"'),
 		);
 		expect(() => buildProject({ cwd: directory, releaseProfile: "production" })).toThrowError(
-			expect.objectContaining<S11tDiagnosticError>({
-				diagnostics: [expect.objectContaining({ code: "S11T_CONFIG_INVALID" })],
+			expect.objectContaining<S11tnextDiagnosticError>({
+				diagnostics: [expect.objectContaining({ code: "S11TNEXT_CONFIG_INVALID" })],
 			}),
 		);
 		expect(() => readFileSync(join(outside, "catalog.json"), "utf8")).toThrow();

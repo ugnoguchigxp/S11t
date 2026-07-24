@@ -4,8 +4,8 @@ const commands = ["lint", "build", "inspect", "completion", "help", "version"];
 const commonOptions = ["--config", "--release-profile", "--format", "--help"];
 
 function bashCompletion(): string {
-	return `# bash completion for s11t
-_s11t_completion() {
+	return `# bash completion for s11tnext
+_s11tnext_completion() {
   local current previous command
   COMPREPLY=()
   current="\${COMP_WORDS[COMP_CWORD]}"
@@ -33,14 +33,14 @@ _s11t_completion() {
 		].join(" ")}" -- "\${current}") ) ;;
   esac
 }
-complete -F _s11t_completion s11t
+complete -F _s11tnext_completion s11tnext
 `;
 }
 
 function zshCompletion(): string {
-	return `#compdef s11t
+	return `#compdef s11tnext
 
-_s11t() {
+_s11tnext() {
   local -a commands
   commands=(
     'lint:validate authored contexts'
@@ -72,30 +72,30 @@ _s11t() {
   esac
 }
 
-_s11t "$@"
+_s11tnext "$@"
 `;
 }
 
 function fishCompletion(): string {
-	return `# fish completion for s11t
-complete -c s11t -f
-complete -c s11t -n '__fish_use_subcommand' -a lint -d 'Validate authored contexts'
-complete -c s11t -n '__fish_use_subcommand' -a build -d 'Compile artifacts and generated types'
-complete -c s11t -n '__fish_use_subcommand' -a inspect -d 'Inspect a context or locale coverage'
-complete -c s11t -n '__fish_use_subcommand' -a completion -d 'Emit shell completion'
-complete -c s11t -n '__fish_use_subcommand' -a help -d 'Show command help'
-complete -c s11t -n '__fish_use_subcommand' -a version -d 'Show the CLI version'
-complete -c s11t -l help -d 'Show help'
-complete -c s11t -l version -d 'Show the CLI version'
-complete -c s11t -n '__fish_seen_subcommand_from lint build inspect' -l config -r -d 'Config path'
-complete -c s11t -n '__fish_seen_subcommand_from lint build inspect' -l release-profile -r -d 'Release profile'
-complete -c s11t -n '__fish_seen_subcommand_from lint build inspect' -l format -r -a 'human json' -d 'Output format'
-complete -c s11t -n '__fish_seen_subcommand_from build' -l check -d 'Check generated outputs'
-complete -c s11t -n '__fish_seen_subcommand_from inspect' -l resolved -d 'Show resolved policy'
-complete -c s11t -n '__fish_seen_subcommand_from inspect' -l locale -r -d 'Instruction locale'
-complete -c s11t -n '__fish_seen_subcommand_from inspect' -l coverage -d 'Show locale coverage'
-complete -c s11t -n '__fish_seen_subcommand_from inspect' -l fallback-locale -r -d 'Fallback locale'
-complete -c s11t -n '__fish_seen_subcommand_from completion' -a 'bash zsh fish'
+	return `# fish completion for s11tnext
+complete -c s11tnext -f
+complete -c s11tnext -n '__fish_use_subcommand' -a lint -d 'Validate authored contexts'
+complete -c s11tnext -n '__fish_use_subcommand' -a build -d 'Compile artifacts and generated types'
+complete -c s11tnext -n '__fish_use_subcommand' -a inspect -d 'Inspect a context or locale coverage'
+complete -c s11tnext -n '__fish_use_subcommand' -a completion -d 'Emit shell completion'
+complete -c s11tnext -n '__fish_use_subcommand' -a help -d 'Show command help'
+complete -c s11tnext -n '__fish_use_subcommand' -a version -d 'Show the CLI version'
+complete -c s11tnext -l help -d 'Show help'
+complete -c s11tnext -l version -d 'Show the CLI version'
+complete -c s11tnext -n '__fish_seen_subcommand_from lint build inspect' -l config -r -d 'Config path'
+complete -c s11tnext -n '__fish_seen_subcommand_from lint build inspect' -l release-profile -r -d 'Release profile'
+complete -c s11tnext -n '__fish_seen_subcommand_from lint build inspect' -l format -r -a 'human json' -d 'Output format'
+complete -c s11tnext -n '__fish_seen_subcommand_from build' -l check -d 'Check generated outputs'
+complete -c s11tnext -n '__fish_seen_subcommand_from inspect' -l resolved -d 'Show resolved policy'
+complete -c s11tnext -n '__fish_seen_subcommand_from inspect' -l locale -r -d 'Instruction locale'
+complete -c s11tnext -n '__fish_seen_subcommand_from inspect' -l coverage -d 'Show locale coverage'
+complete -c s11tnext -n '__fish_seen_subcommand_from inspect' -l fallback-locale -r -d 'Fallback locale'
+complete -c s11tnext -n '__fish_seen_subcommand_from completion' -a 'bash zsh fish'
 `;
 }
 

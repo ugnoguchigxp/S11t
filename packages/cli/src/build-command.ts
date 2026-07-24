@@ -1,10 +1,10 @@
 import { mkdirSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-import { assertCatalogArtifact } from "@s11t/runtime";
+import { assertCatalogArtifact } from "s11tnext";
 
 import { compileProject } from "./compile-source.js";
-import { S11tDiagnosticError, type S11tDiagnostic } from "./diagnostics.js";
+import { S11tnextDiagnosticError, type S11tnextDiagnostic } from "./diagnostics.js";
 import { emitTypes } from "./emit-types.js";
 import { replaceGeneratedPair } from "./generated-output.js";
 
@@ -16,14 +16,14 @@ export type BuildResult = {
 };
 
 function stale(file: string): never {
-	const diagnostic: S11tDiagnostic = {
-		code: "S11T_BUILD_STALE",
+	const diagnostic: S11tnextDiagnostic = {
+		code: "S11TNEXT_BUILD_STALE",
 		severity: "error",
 		message: "Generated output is missing or stale",
 		file,
 		path: [],
 	};
-	throw new S11tDiagnosticError([diagnostic]);
+	throw new S11tnextDiagnosticError([diagnostic]);
 }
 
 function sameBytes(path: string, expected: string): boolean {

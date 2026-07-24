@@ -13,9 +13,9 @@ import {
 	hashRelease,
 } from "./hash.js";
 import type {
-	S11tCatalogArtifact,
-	S11tCompiledContext,
-	S11tCompiledSection,
+	S11tnextCatalogArtifact,
+	S11tnextCompiledContext,
+	S11tnextCompiledSection,
 	TemplateSegment,
 } from "./types.js";
 import { COMPILER_VERSION } from "./version.js";
@@ -102,7 +102,7 @@ function normalizedDefinition(
 function compileSections(
 	sections: CanonicalSectionDefinition[],
 	locale: string,
-): S11tCompiledSection[] {
+): S11tnextCompiledSection[] {
 	return sections.map((section) => {
 		const text = section.locales[locale];
 		if (text === undefined) {
@@ -119,7 +119,7 @@ function compileSections(
 	});
 }
 
-function compileContext(definitionInput: CanonicalContextDefinition): S11tCompiledContext {
+function compileContext(definitionInput: CanonicalContextDefinition): S11tnextCompiledContext {
 	const definition = normalizedDefinition(definitionInput);
 	const definitionHash = hashDefinition(definition);
 	const artifactHashes: Record<string, string> = {};
@@ -160,11 +160,11 @@ function compileContext(definitionInput: CanonicalContextDefinition): S11tCompil
 export function compileCatalog(
 	canonicalDefinitions: readonly CanonicalContextDefinition[],
 	options: CompileCatalogOptions,
-): S11tCatalogArtifact {
+): S11tnextCatalogArtifact {
 	const definitions = [...canonicalDefinitions].sort((left, right) =>
 		compareCodeUnits(left.key, right.key),
 	);
-	const contexts: Record<string, S11tCompiledContext> = {};
+	const contexts: Record<string, S11tnextCompiledContext> = {};
 	const releaseDigests: Record<string, string> = {};
 	const requiredLocales: Record<string, string[]> = {};
 	for (const definition of definitions) {
@@ -180,8 +180,8 @@ export function compileCatalog(
 		releaseProfile: options.releaseProfile,
 		requiredLocales,
 	});
-	const artifact: S11tCatalogArtifact = {
-		format: "s11t.catalog",
+	const artifact: S11tnextCatalogArtifact = {
+		format: "s11tnext.catalog",
 		compilerVersion: COMPILER_VERSION,
 		releaseProfile: options.releaseProfile,
 		policyDigest,

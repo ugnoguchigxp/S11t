@@ -1,8 +1,8 @@
-export type S11tDiagnosticSeverity = "error" | "warning";
+export type S11tnextDiagnosticSeverity = "error" | "warning";
 
-export type S11tDiagnostic = {
+export type S11tnextDiagnostic = {
 	code: string;
-	severity: S11tDiagnosticSeverity;
+	severity: S11tnextDiagnosticSeverity;
 	message: string;
 	file: string;
 	path: Array<string | number>;
@@ -10,12 +10,12 @@ export type S11tDiagnostic = {
 	column?: number;
 };
 
-export class S11tDiagnosticError extends Error {
-	readonly diagnostics: S11tDiagnostic[];
+export class S11tnextDiagnosticError extends Error {
+	readonly diagnostics: S11tnextDiagnostic[];
 
-	constructor(diagnostics: S11tDiagnostic[]) {
+	constructor(diagnostics: S11tnextDiagnostic[]) {
 		super(diagnostics.map((diagnostic) => `${diagnostic.code}: ${diagnostic.message}`).join("\n"));
-		this.name = "S11tDiagnosticError";
+		this.name = "S11tnextDiagnosticError";
 		this.diagnostics = diagnostics.map((diagnostic) => ({
 			...diagnostic,
 			path: [...diagnostic.path],

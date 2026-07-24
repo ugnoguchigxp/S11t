@@ -1,5 +1,5 @@
 source_dir = "contexts"
-out_dir = ".s11t"
+out_dir = ".s11tnext"
 
 [authoring]
 source_locale = "ja-JP"
@@ -7,11 +7,11 @@ source_locale = "ja-JP"
 [governance]
 require_owner = true
 
-[keyspaces.rollout]
-owner = "coverage"
+[keyspaces.codingAgent]
+owner = "coding-agent"
 
 [release_profiles.development]
 required_locales = ["$source"]
 
 [release_profiles.production]
-required_locales = ["$source", "en-US"]
+required_locales = ["ja-JP", "en-US"]

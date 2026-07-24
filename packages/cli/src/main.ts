@@ -1,52 +1,52 @@
-import { COMPILER_VERSION } from "@s11t/runtime/compiler";
+import { COMPILER_VERSION } from "s11tnext/compiler";
 
 import { buildProject } from "./build-command.js";
 import { completionScript, type CompletionShell } from "./completion.js";
-import { S11tDiagnosticError, type S11tDiagnostic } from "./diagnostics.js";
+import { S11tnextDiagnosticError, type S11tnextDiagnostic } from "./diagnostics.js";
 import { inspectContext, inspectCoverage } from "./inspect-command.js";
 import { lintProject } from "./lint-command.js";
 
-export const HELP = `s11t - SystemContext authoring and build tools
+export const HELP = `s11tnext - SystemContext authoring and build tools
 
 Usage:
-  s11t lint --release-profile name [--config s11t.config.toml] [--format human|json]
-  s11t build --release-profile name [--config s11t.config.toml] [--check] [--format human|json]
-  s11t inspect <key> --release-profile name [--resolved] [--locale ja-JP] [--config s11t.config.toml] [--format human|json]
-  s11t inspect --coverage --locale en-US --release-profile name [--fallback-locale ja-JP] [--config s11t.config.toml] [--format human|json]
-  s11t completion bash|zsh|fish
-  s11t help [command]
-  s11t --version
-  s11t --help
+  s11tnext lint --release-profile name [--config s11tnext.config.toml] [--format human|json]
+  s11tnext build --release-profile name [--config s11tnext.config.toml] [--check] [--format human|json]
+  s11tnext inspect <key> --release-profile name [--resolved] [--locale ja-JP] [--config s11tnext.config.toml] [--format human|json]
+  s11tnext inspect --coverage --locale en-US --release-profile name [--fallback-locale ja-JP] [--config s11tnext.config.toml] [--format human|json]
+  s11tnext completion bash|zsh|fish
+  s11tnext help [command]
+  s11tnext --version
+  s11tnext --help
 `;
 
 const COMMAND_HELP: Record<string, string> = {
-	lint: `Usage: s11t lint --release-profile name [--config path] [--format human|json]
+	lint: `Usage: s11tnext lint --release-profile name [--config path] [--format human|json]
 
 Validate configuration, authored contexts, locale policy, and variable safety without writing files.
 `,
-	build: `Usage: s11t build --release-profile name [--config path] [--check] [--format human|json]
+	build: `Usage: s11tnext build --release-profile name [--config path] [--check] [--format human|json]
 
 Compile deterministic catalog.json and catalog.generated.ts outputs.
 --check verifies that both generated files are current without writing them.
 `,
 	inspect: `Usage:
-  s11t inspect <key> --release-profile name [--resolved] [--locale locale] [--config path] [--format human|json]
-  s11t inspect --coverage --locale locale --release-profile name [--fallback-locale locale] [--config path] [--format human|json]
+  s11tnext inspect <key> --release-profile name [--resolved] [--locale locale] [--config path] [--format human|json]
+  s11tnext inspect --coverage --locale locale --release-profile name [--fallback-locale locale] [--config path] [--format human|json]
 
 Inspect a canonical context or report direct, fallback, and missing locale coverage.
 `,
-	completion: `Usage: s11t completion bash|zsh|fish
+	completion: `Usage: s11tnext completion bash|zsh|fish
 
 Print a completion script to stdout. Evaluate it for the current shell or save it in the shell's
 completion directory.
 `,
-	help: `Usage: s11t help [lint|build|inspect|completion|version]
+	help: `Usage: s11tnext help [lint|build|inspect|completion|version]
 
 Show global help or detailed help for one command.
 `,
-	version: `Usage: s11t version
+	version: `Usage: s11tnext version
 
-Print the S11t CLI and compiler version.
+Print the S11tnext CLI and compiler version.
 `,
 };
 
@@ -83,7 +83,7 @@ function takeOptions(arguments_: string[], name: string): string[] {
 	}
 }
 
-function formatDiagnostic(diagnostic: S11tDiagnostic): string {
+function formatDiagnostic(diagnostic: S11tnextDiagnostic): string {
 	const location =
 		diagnostic.line === undefined
 			? diagnostic.file
@@ -279,9 +279,9 @@ export function runCli(
 			io.stderr(`${error.message}\n\n${HELP}`);
 			return 2;
 		}
-		if (error instanceof S11tDiagnosticError) {
+		if (error instanceof S11tnextDiagnosticError) {
 			const usageDiagnostic = error.diagnostics.find((diagnostic) =>
-				diagnostic.code === "S11T_RELEASE_PROFILE_REQUIRED",
+				diagnostic.code === "S11TNEXT_RELEASE_PROFILE_REQUIRED",
 			);
 			if (usageDiagnostic !== undefined) {
 				io.stderr(`${usageDiagnostic.message}\n\n${HELP}`);
@@ -295,7 +295,7 @@ export function runCli(
 			return 1;
 		}
 		const message = error instanceof Error ? error.stack ?? error.message : String(error);
-		io.stderr(`S11T_INTERNAL_ERROR: ${message}\n`);
+		io.stderr(`S11TNEXT_INTERNAL_ERROR: ${message}\n`);
 		return 3;
 	}
 }

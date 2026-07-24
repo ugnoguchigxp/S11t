@@ -1,10 +1,10 @@
 {
-  "format": "s11t.catalog",
+  "format": "s11tnext.catalog",
   "compilerVersion": "0.0.0",
   "releaseProfile": "production",
-  "policyDigest": "sha256:b3695ae997605b42cf88c30d6e98aefe0deed7ce34b4a2ad6e362f6824c2f2e6",
+  "policyDigest": "sha256:0089bb95abe774bb6a20a07e42702f06547a88052f2cf5221ce960338c01211e",
   "createdFrom": {
-    "configPath": "s11t.config.toml",
+    "configPath": "s11tnext.config.toml",
     "sourceFiles": [
       "contexts/codingAgent/identity.context.toml"
     ]
@@ -66,7 +66,7 @@
               ]
             }
           ],
-          "artifactHash": "sha256:e209276d7a8132dcd4a0a2246a2990df69bf4a2de2fce25ce2ed15bcc33afe05"
+          "artifactHash": "sha256:4581c17a7a90148afb7b2064918c66600fbd9c69e8279e7d3ef5e272010665c0"
         },
         "ja-JP": {
           "sections": [
@@ -105,12 +105,12 @@
               ]
             }
           ],
-          "artifactHash": "sha256:e3e14c45f9d0a8eff3da3b5199f33ce859aee02d851633b73e55f21d68420d77"
+          "artifactHash": "sha256:b3cc6f380af61cd188bdd3eaa4ef98951ad7ff9294b33088fe030b9b1fc12160"
         }
       },
-      "definitionHash": "sha256:0aeeaf60f98d684438e3460d1f4ad12b1adcf2b2fb3b0eaa6a6c63f937105564",
-      "releaseDigest": "sha256:5efc507eeb1f8ecc9bbf61a834b8c378e31869f4c7ff4af4d767545af45fadc8"
+      "definitionHash": "sha256:9d6ac59dc4e56930ec3425dc696206b90eb2bf51ad6d399f52c4642320e2910f",
+      "releaseDigest": "sha256:428aae00e00195554077b63a67748ae263027946eb4e7f7fbe34bf0c89b6efa7"
     }
   },
-  "catalogDigest": "sha256:c0a461dcfe599f669eb5ba6cb1c640be4a3b4c90552eac0dad213beab1f843fb"
+  "catalogDigest": "sha256:c5e95698f07f385816bf04f2ac76f12f117a4b04726b1ad3cf9f95a4458f7b93"
 }

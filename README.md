@@ -1,24 +1,24 @@
-# S11t
+# S11tnext
 
-S11t is a backend-first toolkit for authoring, compiling, and rendering SystemContext templates.
+S11tnext is a backend-first toolkit for authoring, compiling, and rendering SystemContext templates.
 
 Authors edit content-first TOML. The CLI emits deterministic JSON artifacts and TypeScript contracts, and
 applications load those artifacts into a filesystem-independent runtime.
 
 ## Development status
 
-S11t is in pre-release development. `@s11t/runtime` and `@s11t/cli` are not yet available from the npm
+S11tnext is in pre-release development. `s11tnext` and `s11tnext-cli` are not yet available from the npm
 registry, so the install commands below apply only after the first registry bootstrap. Until then, use
 this repository as a pnpm workspace and do not depend on the `0.0.0` development version from production.
 
 ## Install after the first release
 
 ```sh
-npm install @s11t/runtime
-npm install --save-dev @s11t/cli
+npm install s11tnext
+npm install --save-dev s11tnext-cli
 ```
 
-S11t derives canonical dot keys from source paths, binds locale at the request boundary, structurally
+S11tnext derives canonical dot keys from source paths, binds locale at the request boundary, structurally
 delimits untrusted values, and returns immutable content identity for audited provider paths. Start with
 the [getting-started guide](./docs/guides/getting-started.md).
 
@@ -39,8 +39,8 @@ the Git remote and package repository metadata are configured.
 
 ## Project boundary
 
-- `@s11t/runtime` contains portable TypeScript and does not import Node.js builtins.
-- `@s11t/cli` owns filesystem access, TOML parsing, validation, and file emission.
+- `s11tnext` contains portable TypeScript and does not import Node.js builtins.
+- `s11tnext-cli` owns filesystem access, TOML parsing, validation, and file emission.
 - LLM calls, authorization, persistence, and provider adapters belong to the host application.
 
 The contracts are documented under [`docs/specification`](./docs/specification), with public JSON

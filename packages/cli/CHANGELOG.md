@@ -1,4 +1,4 @@
-# @s11t/cli
+# s11tnext-cli
 
 ## 0.0.0
 

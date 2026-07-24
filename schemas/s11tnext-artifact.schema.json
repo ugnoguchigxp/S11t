@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://s11t.dev/schemas/s11t-artifact.schema.json",
-  "title": "S11t catalog artifact",
+  "$id": "https://s11tnext.dev/schemas/s11tnext-artifact.schema.json",
+  "title": "S11tnext catalog artifact",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -14,7 +14,7 @@
     "catalogDigest"
   ],
   "properties": {
-    "format": { "const": "s11t.catalog" },
+    "format": { "const": "s11tnext.catalog" },
     "compilerVersion": { "type": "string", "minLength": 1 },
     "releaseProfile": { "type": "string", "minLength": 1 },
     "policyDigest": { "$ref": "#/$defs/digest" },

@@ -13,12 +13,12 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { loadProject } from "../src/discover.js";
-import { S11tDiagnosticError } from "../src/diagnostics.js";
+import { S11tnextDiagnosticError } from "../src/diagnostics.js";
 
 const temporaryDirectories: string[] = [];
 
 function temporaryFixture(name: string): string {
-	const directory = mkdtempSync(join(tmpdir(), "s11t-discover-"));
+	const directory = mkdtempSync(join(tmpdir(), "s11tnext-discover-"));
 	temporaryDirectories.push(directory);
 	cpSync(new URL(`../../../fixtures/${name}`, import.meta.url), directory, { recursive: true });
 	return directory;
@@ -56,10 +56,10 @@ describe("source discovery", () => {
 		try {
 			loadProject(undefined, directory, "production");
 		} catch (error) {
-			expect(error).toBeInstanceOf(S11tDiagnosticError);
-			const diagnostic = (error as S11tDiagnosticError).diagnostics[0];
+			expect(error).toBeInstanceOf(S11tnextDiagnosticError);
+			const diagnostic = (error as S11tnextDiagnosticError).diagnostics[0];
 			expect(diagnostic).toEqual(
-				expect.objectContaining({ code: "S11T_TOML_SYNTAX", line: 1, column: 9 }),
+				expect.objectContaining({ code: "S11TNEXT_TOML_SYNTAX", line: 1, column: 9 }),
 			);
 			return;
 		}
@@ -69,14 +69,14 @@ describe("source discovery", () => {
 	it("rejects a source_dir that is a file", () => {
 		const directory = temporaryFixture("valid/content-first");
 		writeFileSync(join(directory, "not-a-directory"), "text");
-		const configPath = join(directory, "s11t.config.toml");
+		const configPath = join(directory, "s11tnext.config.toml");
 		writeFileSync(
 			configPath,
 			readFileSync(configPath, "utf8").replace('source_dir = "contexts"', 'source_dir = "not-a-directory"'),
 		);
 		expect(() => loadProject(undefined, directory, "production")).toThrowError(
-			expect.objectContaining<S11tDiagnosticError>({
-				diagnostics: [expect.objectContaining({ code: "S11T_CONFIG_INVALID" })],
+			expect.objectContaining<S11tnextDiagnosticError>({
+				diagnostics: [expect.objectContaining({ code: "S11TNEXT_CONFIG_INVALID" })],
 			}),
 		);
 	});
@@ -85,14 +85,14 @@ describe("source discovery", () => {
 		const directory = temporaryFixture("valid/content-first");
 		const outside = temporaryFixture("valid/content-first");
 		symlinkSync(join(outside, "contexts"), join(directory, "linked-contexts"), "dir");
-		const configPath = join(directory, "s11t.config.toml");
+		const configPath = join(directory, "s11tnext.config.toml");
 		writeFileSync(
 			configPath,
 			readFileSync(configPath, "utf8").replace('source_dir = "contexts"', 'source_dir = "linked-contexts"'),
 		);
 		expect(() => loadProject(undefined, directory, "production")).toThrowError(
-			expect.objectContaining<S11tDiagnosticError>({
-				diagnostics: [expect.objectContaining({ code: "S11T_CONFIG_INVALID" })],
+			expect.objectContaining<S11tnextDiagnosticError>({
+				diagnostics: [expect.objectContaining({ code: "S11TNEXT_CONFIG_INVALID" })],
 			}),
 		);
 	});

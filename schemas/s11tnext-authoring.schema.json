@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://s11t.dev/schemas/s11t-authoring.schema.json",
-  "title": "S11t content-first TOML authoring document",
+  "$id": "https://s11tnext.dev/schemas/s11tnext-authoring.schema.json",
+  "title": "S11tnext content-first TOML authoring document",
   "type": "object",
   "additionalProperties": false,
   "properties": {

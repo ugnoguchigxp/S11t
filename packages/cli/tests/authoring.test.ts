@@ -116,7 +116,7 @@ describe("content-first authoring", () => {
 					cwd: fixtureRoot,
 					releaseProfile: "production",
 				}),
-			"S11T_CONTEXT_NOT_FOUND",
+			"S11TNEXT_CONTEXT_NOT_FOUND",
 		);
 		expectDiagnostic(
 			() =>
@@ -125,7 +125,7 @@ describe("content-first authoring", () => {
 					releaseProfile: "production",
 					locale: "fr-FR",
 				}),
-			"S11T_LOCALE_NOT_FOUND",
+			"S11TNEXT_LOCALE_NOT_FOUND",
 		);
 
 	});
@@ -172,7 +172,7 @@ describe("content-first authoring", () => {
 					releaseProfile: "development",
 					locale: "invalid locale",
 				}),
-			"S11T_LOCALE_INVALID",
+			"S11TNEXT_LOCALE_INVALID",
 		);
 		expectDiagnostic(
 			() =>
@@ -182,7 +182,7 @@ describe("content-first authoring", () => {
 					locale: "en-US",
 					fallbackLocales: ["ja-JP", "ja-JP"],
 				}),
-			"S11T_LOCALE_INVALID",
+			"S11TNEXT_LOCALE_INVALID",
 		);
 	});
 
@@ -199,7 +199,7 @@ describe("content-first authoring", () => {
 						development: { required_locales: ["$source", "ja-JP"] },
 					},
 				}),
-			"S11T_CONFIG_INVALID",
+			"S11TNEXT_CONFIG_INVALID",
 		);
 	});
 
@@ -217,7 +217,7 @@ describe("content-first authoring", () => {
 					},
 					key_aliases: { "example.old": "example.current" },
 				}),
-			"S11T_CONFIG_INVALID",
+			"S11TNEXT_CONFIG_INVALID",
 		);
 	});
 
@@ -236,7 +236,7 @@ describe("content-first authoring", () => {
 		).toThrowError(
 			expect.objectContaining({
 				diagnostics: [
-					expect.objectContaining({ code: "S11T_SOURCE_LOCALE_OVERRIDE" }),
+					expect.objectContaining({ code: "S11TNEXT_SOURCE_LOCALE_OVERRIDE" }),
 				],
 			}),
 		);
@@ -298,7 +298,7 @@ describe("content-first authoring", () => {
 					testConfig(),
 					"development",
 				),
-			"S11T_TRANSLATION_PLACEHOLDER_MISMATCH",
+			"S11TNEXT_TRANSLATION_PLACEHOLDER_MISMATCH",
 		);
 	});
 
@@ -313,7 +313,7 @@ describe("content-first authoring", () => {
 					testConfig(),
 					"constructor",
 				),
-			code: "S11T_RELEASE_PROFILE_NOT_FOUND",
+			code: "S11TNEXT_RELEASE_PROFILE_NOT_FOUND",
 		},
 		{
 			name: "variable profile",
@@ -328,7 +328,7 @@ describe("content-first authoring", () => {
 					testConfig(),
 					"development",
 				),
-			code: "S11T_VARIABLE_PROFILE_NOT_FOUND",
+			code: "S11TNEXT_VARIABLE_PROFILE_NOT_FOUND",
 		},
 	])("does not resolve inherited object properties as a $name", ({ action, code }) => {
 		expectDiagnostic(action, code);
@@ -339,49 +339,49 @@ describe("content-first authoring", () => {
 			name: "non-object source",
 			input: null,
 			sourcePath: "example/greeting.context.toml",
-			code: "S11T_SOURCE_INVALID",
+			code: "S11TNEXT_SOURCE_INVALID",
 		},
 		{
 			name: "unsupported root field",
 			input: { text: "正本", unsupported: true },
 			sourcePath: "example/greeting.context.toml",
-			code: "S11T_SOURCE_INVALID",
+			code: "S11TNEXT_SOURCE_INVALID",
 		},
 		{
 			name: "invalid source suffix",
 			input: { text: "正本" },
 			sourcePath: "example/greeting.toml",
-			code: "S11T_KEY_INVALID",
+			code: "S11TNEXT_KEY_INVALID",
 		},
 		{
 			name: "invalid source segment",
 			input: { text: "正本" },
 			sourcePath: "example/bad segment.context.toml",
-			code: "S11T_KEY_INVALID",
+			code: "S11TNEXT_KEY_INVALID",
 		},
 		{
 			name: "explicit key",
 			input: { key: "example:greeting", text: "正本" },
 			sourcePath: "example/greeting.context.toml",
-			code: "S11T_SOURCE_INVALID",
+			code: "S11TNEXT_SOURCE_INVALID",
 		},
 		{
 			name: "unsupported content kind",
 			input: { content_kind: "json", text: "正本" },
 			sourcePath: "example/greeting.context.toml",
-			code: "S11T_SOURCE_INVALID",
+			code: "S11TNEXT_SOURCE_INVALID",
 		},
 		{
 			name: "missing content",
 			input: {},
 			sourcePath: "example/greeting.context.toml",
-			code: "S11T_SOURCE_SHAPE_CONFLICT",
+			code: "S11TNEXT_SOURCE_SHAPE_CONFLICT",
 		},
 		{
 			name: "text and sections conflict",
 			input: { text: "正本", sections: [] },
 			sourcePath: "example/greeting.context.toml",
-			code: "S11T_SOURCE_SHAPE_CONFLICT",
+			code: "S11TNEXT_SOURCE_SHAPE_CONFLICT",
 		},
 		{
 			name: "root translation with sections",
@@ -399,13 +399,13 @@ describe("content-first authoring", () => {
 				translations: { "en-US": { text: "Source" } },
 			},
 			sourcePath: "example/greeting.context.toml",
-			code: "S11T_SOURCE_SHAPE_CONFLICT",
+			code: "S11TNEXT_SOURCE_SHAPE_CONFLICT",
 		},
 		{
 			name: "invalid locale",
 			input: { text: "正本", translations: { invalid_locale: { text: "Source" } } },
 			sourcePath: "example/greeting.context.toml",
-			code: "S11T_SOURCE_INVALID",
+			code: "S11TNEXT_SOURCE_INVALID",
 		},
 		{
 			name: "invalid variable name",
@@ -421,7 +421,7 @@ describe("content-first authoring", () => {
 				},
 			},
 			sourcePath: "example/greeting.context.toml",
-			code: "S11T_SOURCE_INVALID",
+			code: "S11TNEXT_SOURCE_INVALID",
 		},
 		{
 			name: "unsafe untrusted raw variable",
@@ -437,7 +437,7 @@ describe("content-first authoring", () => {
 				},
 			},
 			sourcePath: "example/greeting.context.toml",
-			code: "S11T_UNSAFE_UNTRUSTED_RAW",
+			code: "S11TNEXT_UNSAFE_UNTRUSTED_RAW",
 		},
 		{
 			name: "unsafe untrusted inline variable",
@@ -453,7 +453,7 @@ describe("content-first authoring", () => {
 				},
 			},
 			sourcePath: "example/greeting.context.toml",
-			code: "S11T_UNSAFE_UNTRUSTED_PLACEMENT",
+			code: "S11TNEXT_UNSAFE_UNTRUSTED_PLACEMENT",
 		},
 		{
 			name: "raw non-string variable",
@@ -469,7 +469,7 @@ describe("content-first authoring", () => {
 				},
 			},
 			sourcePath: "example/greeting.context.toml",
-			code: "S11T_ENCODING_TYPE_MISMATCH",
+			code: "S11TNEXT_ENCODING_TYPE_MISMATCH",
 		},
 		{
 			name: "json string with json variable",
@@ -485,19 +485,19 @@ describe("content-first authoring", () => {
 				},
 			},
 			sourcePath: "example/greeting.context.toml",
-			code: "S11T_ENCODING_TYPE_MISMATCH",
+			code: "S11TNEXT_ENCODING_TYPE_MISMATCH",
 		},
 		{
 			name: "invalid placeholder syntax",
 			input: { text: "[[broken]" },
 			sourcePath: "example/greeting.context.toml",
-			code: "S11T_PLACEHOLDER_INVALID",
+			code: "S11TNEXT_PLACEHOLDER_INVALID",
 		},
 		{
 			name: "undeclared placeholder",
 			input: { text: "[[missing]]" },
 			sourcePath: "example/greeting.context.toml",
-			code: "S11T_VARIABLE_UNDECLARED",
+			code: "S11TNEXT_VARIABLE_UNDECLARED",
 		},
 		{
 			name: "unused variable",
@@ -513,13 +513,13 @@ describe("content-first authoring", () => {
 				},
 			},
 			sourcePath: "example/greeting.context.toml",
-			code: "S11T_VARIABLE_UNUSED",
+			code: "S11TNEXT_VARIABLE_UNUSED",
 		},
 		{
 			name: "empty sections",
 			input: { sections: [] },
 			sourcePath: "example/greeting.context.toml",
-			code: "S11T_SOURCE_INVALID",
+			code: "S11TNEXT_SOURCE_INVALID",
 		},
 	])("rejects $name", ({ input, sourcePath, code }) => {
 		expectDiagnostic(
@@ -548,7 +548,7 @@ describe("content-first authoring", () => {
 		expect(document.definition.owner).toBe("unowned");
 		expectDiagnostic(
 			() => validateResolvedDocuments([document, { ...document, file: "duplicate.toml" }]),
-			"S11T_KEY_COLLISION",
+			"S11TNEXT_KEY_COLLISION",
 		);
 	});
 });

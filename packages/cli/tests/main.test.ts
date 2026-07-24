@@ -9,7 +9,7 @@ import { runCli, type CommandIo } from "../src/main.js";
 const temporaryDirectories: string[] = [];
 
 function temporaryFixture(name: string): string {
-	const directory = mkdtempSync(join(tmpdir(), "s11t-cli-"));
+	const directory = mkdtempSync(join(tmpdir(), "s11tnext-cli-"));
 	temporaryDirectories.push(directory);
 	cpSync(new URL(`../../../fixtures/${name}`, import.meta.url), directory, { recursive: true });
 	return directory;
@@ -55,15 +55,15 @@ describe("CLI", () => {
 		expect(execute(["unknown", "--help"], directory).code).toBe(2);
 		const buildHelp = execute(["build", "--help"], directory);
 		expect(buildHelp).toMatchObject({ code: 0, stderr: "" });
-		expect(buildHelp.stdout).toContain("Usage: s11t build");
+		expect(buildHelp.stdout).toContain("Usage: s11tnext build");
 		expect(buildHelp.stdout).toContain("--check");
 		expect(execute(["help", "inspect"], directory).stdout).toContain(
-			"s11t inspect --coverage",
+			"s11tnext inspect --coverage",
 		);
 		for (const shell of ["bash", "zsh", "fish"]) {
 			const completion = execute(["completion", shell], directory);
 			expect(completion).toMatchObject({ code: 0, stderr: "" });
-			expect(completion.stdout).toContain("s11t");
+			expect(completion.stdout).toContain("s11tnext");
 		}
 		expect(execute(["completion", "powershell"], directory).code).toBe(2);
 	});
@@ -87,7 +87,7 @@ describe("CLI", () => {
 		);
 		expect(invalid.code).toBe(1);
 		expect(JSON.parse(invalid.stderr)[0]).toEqual(
-			expect.objectContaining({ code: "S11T_UNSAFE_UNTRUSTED_RAW" }),
+			expect.objectContaining({ code: "S11TNEXT_UNSAFE_UNTRUSTED_RAW" }),
 		);
 	});
 

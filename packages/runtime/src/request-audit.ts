@@ -11,11 +11,11 @@ import type {
 	TextRenderer,
 	TextRendererObject,
 } from "./catalog-types.js";
-import { S11tError } from "./diagnostics.js";
-import type { S11tCatalogArtifact } from "./types.js";
+import { S11tnextError } from "./diagnostics.js";
+import type { S11tnextCatalogArtifact } from "./types.js";
 
 export function createRequestCatalog<C extends DefaultContract>(
-	artifact: S11tCatalogArtifact,
+	artifact: S11tnextCatalogArtifact,
 	binding: CatalogBinding,
 	textKeys: readonly string[],
 ): BoundRequestCatalog<C> {
@@ -28,8 +28,8 @@ export function createRequestCatalog<C extends DefaultContract>(
 	let finalized = false;
 	const assertOpen = (): void => {
 		if (finalized) {
-			throw new S11tError(
-				"S11T_VALUE_INVALID",
+			throw new S11tnextError(
+				"S11TNEXT_VALUE_INVALID",
 				"Request binding is already finalized",
 				["request"],
 			);
@@ -80,8 +80,8 @@ export function createRequestCatalog<C extends DefaultContract>(
 			!requestInvocations.has(finalInvocation) ||
 			lastInvocation !== finalInvocation
 		) {
-			throw new S11tError(
-				"S11T_VALUE_INVALID",
+			throw new S11tnextError(
+				"S11TNEXT_VALUE_INVALID",
 				"Final invocation must be the latest invocation produced by this request",
 				["finalInvocation"],
 			);

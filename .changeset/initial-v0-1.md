@@ -1,9 +1,9 @@
 ---
-"@s11t/runtime": minor
-"@s11t/cli": minor
+"s11tnext": minor
+"s11tnext-cli": minor
 ---
 
-Publish the initial S11t runtime and CLI packages.
+Publish the initial S11tnext runtime and CLI packages.
 
 - Compile content-first TOML into one deterministic catalog format with path-derived keys and generated
   TypeScript contracts.

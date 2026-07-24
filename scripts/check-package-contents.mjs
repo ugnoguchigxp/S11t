@@ -15,9 +15,13 @@ const requiredRootFiles = [
 	"LICENSE",
 	"NOTICE",
 ];
-const expectedPackageNames = ["@s11t/runtime", "@s11t/cli"];
-const expectedRepositoryUrl = "git+https://github.com/ugnoguchigxp/S11t.git";
-const expectedBugsUrl = "https://github.com/ugnoguchigxp/S11t/issues";
+const expectedPackageNames = ["s11tnext", "s11tnext-cli"];
+const expectedRepositoryUrl = "git+https://github.com/ugnoguchigxp/s11tnext.git";
+const expectedBugsUrl = "https://github.com/ugnoguchigxp/s11tnext/issues";
+const packageDirectories = new Map([
+	["s11tnext", "runtime"],
+	["s11tnext-cli", "cli"],
+]);
 
 function filesUnder(root) {
 	const files = [];
@@ -34,7 +38,7 @@ function isAllowed(name, packageName) {
 	if (/^dist\/(?!.*(?:^|\/)\.\.?\/)[A-Za-z0-9_./-]+\.(?:js|d\.ts)$/.test(name)) {
 		return true;
 	}
-	return packageName === "@s11t/cli" && name === "bin/s11t.js";
+	return packageName === "s11tnext-cli" && name === "bin/s11tnext.js";
 }
 
 function assertSafeTarPath(path) {
@@ -110,15 +114,15 @@ async function inspectPackage(entry) {
 	if (!fileEntries.some((item) => item.path.startsWith("package/dist/"))) {
 		throw new Error(`${entry.name} contains no compiled output`);
 	}
-	if (entry.name === "@s11t/cli") {
-		const bin = fileEntries.find((item) => item.path === "package/bin/s11t.js");
-		if (bin === undefined) throw new Error("CLI tarball is missing bin/s11t.js");
+	if (entry.name === "s11tnext-cli") {
+		const bin = fileEntries.find((item) => item.path === "package/bin/s11tnext.js");
+		if (bin === undefined) throw new Error("CLI tarball is missing bin/s11tnext.js");
 		if (process.platform !== "win32" && ((bin.mode ?? 0) & 0o111) === 0) {
-			throw new Error("CLI bin/s11t.js is not executable");
+			throw new Error("CLI bin/s11tnext.js is not executable");
 		}
 	}
 
-	const temporary = mkdtempSync(join(tmpdir(), "s11t-package-"));
+	const temporary = mkdtempSync(join(tmpdir(), "s11tnext-package-"));
 	try {
 		await extractTar({ file: tarball, cwd: temporary, strict: true });
 		const packageRoot = resolve(temporary, "package");
@@ -130,11 +134,11 @@ async function inspectPackage(entry) {
 		if (
 			packageJson.repository?.type !== "git" ||
 			packageJson.repository?.url !== expectedRepositoryUrl ||
-			packageJson.repository?.directory !== `packages/${entry.name.slice("@s11t/".length)}`
+			packageJson.repository?.directory !== `packages/${packageDirectories.get(entry.name)}`
 		) {
 			throw new Error(`${entry.name} has invalid repository metadata`);
 		}
-		if (!packageJson.homepage?.startsWith("https://github.com/ugnoguchigxp/S11t/")) {
+		if (!packageJson.homepage?.startsWith("https://github.com/ugnoguchigxp/s11tnext/")) {
 			throw new Error(`${entry.name} has invalid homepage metadata`);
 		}
 		if (packageJson.bugs?.url !== expectedBugsUrl) {
@@ -204,13 +208,13 @@ if (
 const packageJsonByName = new Map();
 for (const entry of manifest.packages) packageJsonByName.set(entry.name, await inspectPackage(entry));
 
-const runtime = packageJsonByName.get("@s11t/runtime");
-const cli = packageJsonByName.get("@s11t/cli");
+const runtime = packageJsonByName.get("s11tnext");
+const cli = packageJsonByName.get("s11tnext-cli");
 if (runtime === undefined || cli === undefined) throw new Error("Runtime or CLI package is missing");
 if (runtime.version !== cli.version) throw new Error("Packed package versions differ");
-if (cli.dependencies?.["@s11t/runtime"] !== runtime.version) {
+if (cli.dependencies?.["s11tnext"] !== runtime.version) {
 	throw new Error(
-		`CLI must depend on packed runtime ${runtime.version}; found ${cli.dependencies?.["@s11t/runtime"] ?? "missing"}`,
+		`CLI must depend on packed runtime ${runtime.version}; found ${cli.dependencies?.["s11tnext"] ?? "missing"}`,
 	);
 }
 if (Object.keys(runtime.exports ?? {}).sort().join(",") !== ".,./compiler") {
@@ -220,9 +224,9 @@ if (Object.keys(cli.exports ?? {}).join(",") !== ".") throw new Error("CLI packa
 if (Object.keys(runtime.dependencies ?? {}).join(",") !== "@noble/hashes") {
 	throw new Error("Runtime package dependencies are unexpected");
 }
-if (Object.keys(cli.dependencies ?? {}).sort().join(",") !== "@s11t/runtime,smol-toml") {
+if (Object.keys(cli.dependencies ?? {}).sort().join(",") !== "s11tnext,smol-toml") {
 	throw new Error("CLI package dependencies are unexpected");
 }
-if (cli.bin?.s11t !== "./bin/s11t.js") throw new Error("CLI bin export is incorrect");
+if (cli.bin?.s11tnext !== "./bin/s11tnext.js") throw new Error("CLI bin export is incorrect");
 
 process.stdout.write(`Package content allowlist passed for ${runtime.version}.\n`);

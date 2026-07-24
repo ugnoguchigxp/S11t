@@ -7,10 +7,10 @@ import type {
 	CatalogBinding,
 	SystemContextInvocation,
 } from "./catalog-types.js";
-import { S11tError } from "./diagnostics.js";
+import { S11tnextError } from "./diagnostics.js";
 import { encodeValue } from "./encoding.js";
 import { hashRendered } from "./hash.js";
-import type { S11tCatalogArtifact } from "./types.js";
+import type { S11tnextCatalogArtifact } from "./types.js";
 
 const LOCALE_PATTERN = /^[A-Za-z]{2,8}(?:-[A-Za-z0-9]{1,8})*$/;
 
@@ -18,7 +18,7 @@ export function validateBinding(
 	binding: CatalogBinding,
 ): Required<CatalogBinding> {
 	if (binding === null || typeof binding !== "object" || Array.isArray(binding)) {
-		throw new S11tError("S11T_VALUE_INVALID", "Binding must be an object", [
+		throw new S11tnextError("S11TNEXT_VALUE_INVALID", "Binding must be an object", [
 			"binding",
 		]);
 	}
@@ -28,8 +28,8 @@ export function validateBinding(
 			typeof key !== "string" ||
 			!["instructionLocale", "fallbackLocales"].includes(key)
 		) {
-			throw new S11tError(
-				"S11T_VALUE_INVALID",
+			throw new S11tnextError(
+				"S11TNEXT_VALUE_INVALID",
 				"Binding contains an unsupported field",
 				[typeof key === "string" ? key : "binding"],
 			);
@@ -40,8 +40,8 @@ export function validateBinding(
 			!descriptor.enumerable ||
 			!("value" in descriptor)
 		) {
-			throw new S11tError(
-				"S11T_VALUE_INVALID",
+			throw new S11tnextError(
+				"S11TNEXT_VALUE_INVALID",
 				"Binding must use data properties",
 				[key],
 			);
@@ -59,8 +59,8 @@ export function validateBinding(
 		typeof instructionLocale !== "string" ||
 		!LOCALE_PATTERN.test(instructionLocale)
 	) {
-		throw new S11tError(
-			"S11T_VALUE_INVALID",
+		throw new S11tnextError(
+			"S11TNEXT_VALUE_INVALID",
 			"instructionLocale is invalid",
 			["instructionLocale"],
 		);
@@ -74,8 +74,8 @@ export function validateBinding(
 			? fallbackDescriptor.value
 			: [];
 	if (!Array.isArray(fallbackInput)) {
-		throw new S11tError(
-			"S11T_VALUE_INVALID",
+		throw new S11tnextError(
+			"S11TNEXT_VALUE_INVALID",
 			"fallbackLocales must be an array",
 			["fallbackLocales"],
 		);
@@ -88,8 +88,8 @@ export function validateBinding(
 			!/^(?:0|[1-9]\d*)$/.test(key) ||
 			Number(key) >= fallbackInput.length
 		) {
-			throw new S11tError(
-				"S11T_VALUE_INVALID",
+			throw new S11tnextError(
+				"S11TNEXT_VALUE_INVALID",
 				"fallbackLocales contains an unsupported field",
 				["fallbackLocales"],
 			);
@@ -100,8 +100,8 @@ export function validateBinding(
 			!descriptor.enumerable ||
 			!("value" in descriptor)
 		) {
-			throw new S11tError(
-				"S11T_VALUE_INVALID",
+			throw new S11tnextError(
+				"S11TNEXT_VALUE_INVALID",
 				"fallbackLocales must use data properties",
 				["fallbackLocales", Number(key)],
 			);
@@ -113,8 +113,8 @@ export function validateBinding(
 			String(index),
 		);
 		if (descriptor === undefined || !("value" in descriptor)) {
-			throw new S11tError(
-				"S11T_VALUE_INVALID",
+			throw new S11tnextError(
+				"S11TNEXT_VALUE_INVALID",
 				"fallbackLocales cannot be sparse",
 				["fallbackLocales", index],
 			);
@@ -129,8 +129,8 @@ export function validateBinding(
 		fallbackLocales.includes(instructionLocale) ||
 		new Set(fallbackLocales).size !== fallbackLocales.length
 	) {
-		throw new S11tError(
-			"S11T_VALUE_INVALID",
+		throw new S11tnextError(
+			"S11TNEXT_VALUE_INVALID",
 			"fallbackLocales must be unique valid locales",
 			["fallbackLocales"],
 		);
@@ -142,17 +142,17 @@ export function validateBinding(
 }
 
 function delimitEncodedValue(name: string, value: string): string {
-	return `<S11T_DELIMITED_CONTEXT variable="${name}">\n${value}\n</S11T_DELIMITED_CONTEXT>`;
+	return `<S11TNEXT_DELIMITED_CONTEXT variable="${name}">\n${value}\n</S11TNEXT_DELIMITED_CONTEXT>`;
 }
 
 export function invokeContext(
-	artifact: S11tCatalogArtifact,
+	artifact: S11tnextCatalogArtifact,
 	key: string,
 	valuesInput: unknown,
 	binding: CatalogBinding,
 ): SystemContextInvocation {
 	if (!Object.hasOwn(artifact.contexts, key)) {
-		throw new S11tError("S11T_CONTEXT_NOT_FOUND", `Context not found: ${key}`, [
+		throw new S11tnextError("S11TNEXT_CONTEXT_NOT_FOUND", `Context not found: ${key}`, [
 			key,
 		]);
 	}
@@ -165,8 +165,8 @@ export function invokeContext(
 		Object.hasOwn(context.locales, locale),
 	);
 	if (resolvedLocale === undefined) {
-		throw new S11tError(
-			"S11T_LOCALE_NOT_FOUND",
+		throw new S11tnextError(
+			"S11TNEXT_LOCALE_NOT_FOUND",
 			`Locale not found: ${binding.instructionLocale}`,
 			[key, binding.instructionLocale],
 		);
@@ -174,14 +174,14 @@ export function invokeContext(
 	const values = valuesRecord(valuesInput);
 	for (const name of Object.keys(context.variables)) {
 		if (!Object.hasOwn(values, name)) {
-			throw new S11tError("S11T_VALUE_MISSING", `Missing value: ${name}`, [
+			throw new S11tnextError("S11TNEXT_VALUE_MISSING", `Missing value: ${name}`, [
 				name,
 			]);
 		}
 	}
 	for (const name of Object.keys(values)) {
 		if (!Object.hasOwn(context.variables, name)) {
-			throw new S11tError("S11T_VALUE_EXTRA", `Unexpected value: ${name}`, [
+			throw new S11tnextError("S11TNEXT_VALUE_EXTRA", `Unexpected value: ${name}`, [
 				name,
 			]);
 		}

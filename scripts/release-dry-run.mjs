@@ -78,7 +78,7 @@ function githubSlug(value) {
 
 function assertReleaseMetadata(packageJson, expectedRepository) {
 	if (packageJson.private === true) throw new Error(`${packageJson.name} is marked private`);
-	if (!/^@s11t\/[a-z0-9-]+$/.test(packageJson.name ?? "")) {
+	if (!["s11tnext", "s11tnext-cli"].includes(packageJson.name)) {
 		throw new Error(`Unexpected package name: ${packageJson.name ?? "missing"}`);
 	}
 	if (

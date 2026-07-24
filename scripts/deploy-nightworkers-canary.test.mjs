@@ -33,14 +33,14 @@ function temporaryDirectory(prefix) {
 const commit = "a".repeat(40);
 
 function createNightWorkersTarget() {
-	const target = temporaryDirectory("s11t-deploy-orchestration-");
+	const target = temporaryDirectory("s11tnext-deploy-orchestration-");
 	mkdirSync(resolve(target, ".git"), { recursive: true });
-	mkdirSync(resolve(target, "vendor/s11t/nested"), { recursive: true });
+	mkdirSync(resolve(target, "vendor/s11tnext/nested"), { recursive: true });
 	writeFileSync(resolve(target, "package.json"), '{"name":"nightworkers","original":true}\n');
 	writeFileSync(resolve(target, "bun.lock"), "original lock\n");
-	writeFileSync(resolve(target, "vendor/s11t/manifest.json"), '{"version":"old"}\n');
-	writeFileSync(resolve(target, "vendor/s11t/nested/old.tgz"), "old tarball");
-	writeFileSync(resolve(target, "vendor/s11t/s11t-runtime-old.tgz"), "old runtime");
+	writeFileSync(resolve(target, "vendor/s11tnext/manifest.json"), '{"version":"old"}\n');
+	writeFileSync(resolve(target, "vendor/s11tnext/nested/old.tgz"), "old tarball");
+	writeFileSync(resolve(target, "vendor/s11tnext/s11tnext-old.tgz"), "old runtime");
 	return target;
 }
 
@@ -48,22 +48,22 @@ function originalTargetState(target) {
 	return {
 		packageJson: readFileSync(resolve(target, "package.json"), "utf8"),
 		lock: readFileSync(resolve(target, "bun.lock"), "utf8"),
-		manifest: readFileSync(resolve(target, "vendor/s11t/manifest.json"), "utf8"),
-		oldTarball: readFileSync(resolve(target, "vendor/s11t/nested/old.tgz"), "utf8"),
-		oldRuntime: readFileSync(resolve(target, "vendor/s11t/s11t-runtime-old.tgz"), "utf8"),
+		manifest: readFileSync(resolve(target, "vendor/s11tnext/manifest.json"), "utf8"),
+		oldTarball: readFileSync(resolve(target, "vendor/s11tnext/nested/old.tgz"), "utf8"),
+		oldRuntime: readFileSync(resolve(target, "vendor/s11tnext/s11tnext-old.tgz"), "utf8"),
 	};
 }
 
 function expectOriginalTargetState(target, before) {
 	expect(readFileSync(resolve(target, "package.json"), "utf8")).toBe(before.packageJson);
 	expect(readFileSync(resolve(target, "bun.lock"), "utf8")).toBe(before.lock);
-	expect(readFileSync(resolve(target, "vendor/s11t/manifest.json"), "utf8")).toBe(
+	expect(readFileSync(resolve(target, "vendor/s11tnext/manifest.json"), "utf8")).toBe(
 		before.manifest,
 	);
-	expect(readFileSync(resolve(target, "vendor/s11t/nested/old.tgz"), "utf8")).toBe(
+	expect(readFileSync(resolve(target, "vendor/s11tnext/nested/old.tgz"), "utf8")).toBe(
 		before.oldTarball,
 	);
-	expect(readFileSync(resolve(target, "vendor/s11t/s11t-runtime-old.tgz"), "utf8")).toBe(
+	expect(readFileSync(resolve(target, "vendor/s11tnext/s11tnext-old.tgz"), "utf8")).toBe(
 		before.oldRuntime,
 	);
 }
@@ -75,12 +75,15 @@ function fakeDeploymentDependencies(target, failureCheckpoint) {
 		const directory = resolve(worktree, ".artifacts/packages");
 		mkdirSync(directory, { recursive: true });
 		const version = `0.1.0-canary-${commit}`;
-		const packages = ["runtime", "cli"].map((name) => {
-			const file = `s11t-${name}-${version}.tgz`;
-			const bytes = `${name} tarball`;
+		const packages = [
+			{ name: "s11tnext", label: "runtime" },
+			{ name: "s11tnext-cli", label: "cli" },
+		].map(({ name, label }) => {
+			const file = `${name}-${version}.tgz`;
+			const bytes = `${label} tarball`;
 			writeFileSync(resolve(directory, file), bytes);
 			return {
-				name: `@s11t/${name}`,
+				name,
 				version,
 				file,
 				sha512: createHash("sha512").update(bytes).digest("hex"),
@@ -93,12 +96,12 @@ function fakeDeploymentDependencies(target, failureCheckpoint) {
 	}
 	function installTarget() {
 		const packageJson = JSON.parse(readFileSync(resolve(target, "package.json"), "utf8"));
-		const runtimeReference = packageJson.dependencies?.["@s11t/runtime"];
-		const cliReference = packageJson.devDependencies?.["@s11t/cli"];
+		const runtimeReference = packageJson.dependencies?.["s11tnext"];
+		const cliReference = packageJson.devDependencies?.["s11tnext-cli"];
 		if (typeof runtimeReference !== "string" || typeof cliReference !== "string") return;
-		const manifest = JSON.parse(readFileSync(resolve(target, "vendor/s11t/manifest.json"), "utf8"));
+		const manifest = JSON.parse(readFileSync(resolve(target, "vendor/s11tnext/manifest.json"), "utf8"));
 		for (const entry of manifest.packages) {
-			const directory = resolve(target, `node_modules/@s11t/${entry.name.split("/")[1]}`);
+			const directory = resolve(target, `node_modules/${entry.name}`);
 			mkdirSync(directory, { recursive: true });
 			writeFileSync(
 				resolve(directory, "package.json"),
@@ -112,7 +115,7 @@ function fakeDeploymentDependencies(target, failureCheckpoint) {
 		writeFileSync(
 			resolve(target, "bun.lock"),
 			manifest.packages
-				.map((entry) => `${entry.name}@./vendor/s11t/${entry.file}`)
+				.map((entry) => `${entry.name}@./vendor/s11tnext/${entry.file}`)
 				.join("\n"),
 		);
 	}
@@ -153,7 +156,7 @@ function fakeDeploymentDependencies(target, failureCheckpoint) {
 			} else if (
 				(command === "bun" || command === "bun.exe") &&
 				arguments_[0] === "run" &&
-				["s11t", "typecheck", "build"].includes(arguments_[1])
+				["s11tnext", "typecheck", "build"].includes(arguments_[1])
 			) {
 				// Installed package checks are validated through the target fixture.
 			} else if (command === process.execPath && arguments_[0] === "--input-type=module") {
@@ -176,68 +179,68 @@ afterEach(() => {
 
 describe("NightWorkers deployment rollback", () => {
 	it("restores package files and the vendored tree byte-for-byte", () => {
-		const target = temporaryDirectory("s11t-deploy-target-");
-		const backup = temporaryDirectory("s11t-deploy-backup-");
-		mkdirSync(resolve(target, "vendor/s11t/nested"), { recursive: true });
-		mkdirSync(resolve(target, "vendor/s11t/empty"), { recursive: true });
+		const target = temporaryDirectory("s11tnext-deploy-target-");
+		const backup = temporaryDirectory("s11tnext-deploy-backup-");
+		mkdirSync(resolve(target, "vendor/s11tnext/nested"), { recursive: true });
+		mkdirSync(resolve(target, "vendor/s11tnext/empty"), { recursive: true });
 		writeFileSync(resolve(target, "package.json"), '{"name":"nightworkers","original":true}\n');
 		writeFileSync(resolve(target, "bun.lock"), "original lock\n");
-		writeFileSync(resolve(target, "vendor/s11t/manifest.json"), '{"version":"old"}\n');
-		writeFileSync(resolve(target, "vendor/s11t/nested/package.tgz"), "old tarball");
+		writeFileSync(resolve(target, "vendor/s11tnext/manifest.json"), '{"version":"old"}\n');
+		writeFileSync(resolve(target, "vendor/s11tnext/nested/package.tgz"), "old tarball");
 		if (process.platform !== "win32") {
 			chmodSync(resolve(target, "package.json"), 0o640);
 			chmodSync(resolve(target, "bun.lock"), 0o600);
-			chmodSync(resolve(target, "vendor/s11t/manifest.json"), 0o600);
-			chmodSync(resolve(target, "vendor/s11t/empty"), 0o700);
+			chmodSync(resolve(target, "vendor/s11tnext/manifest.json"), 0o600);
+			chmodSync(resolve(target, "vendor/s11tnext/empty"), 0o700);
 		}
 
 		const state = backupManagedFiles(target, backup);
 		writeFileSync(resolve(target, "package.json"), '{"name":"nightworkers","original":false}\n');
 		writeFileSync(resolve(target, "bun.lock"), "new lock\n");
-		rmSync(resolve(target, "vendor/s11t"), { recursive: true, force: true });
-		mkdirSync(resolve(target, "vendor/s11t"), { recursive: true });
-		writeFileSync(resolve(target, "vendor/s11t/new.tgz"), "new tarball");
+		rmSync(resolve(target, "vendor/s11tnext"), { recursive: true, force: true });
+		mkdirSync(resolve(target, "vendor/s11tnext"), { recursive: true });
+		writeFileSync(resolve(target, "vendor/s11tnext/new.tgz"), "new tarball");
 
 		restoreManagedFiles(target, backup, state);
 		expect(readFileSync(resolve(target, "package.json"), "utf8")).toBe(
 			'{"name":"nightworkers","original":true}\n',
 		);
 		expect(readFileSync(resolve(target, "bun.lock"), "utf8")).toBe("original lock\n");
-		expect(readFileSync(resolve(target, "vendor/s11t/nested/package.tgz"), "utf8")).toBe(
+		expect(readFileSync(resolve(target, "vendor/s11tnext/nested/package.tgz"), "utf8")).toBe(
 			"old tarball",
 		);
-		expect(existsSync(resolve(target, "vendor/s11t/empty"))).toBe(true);
+		expect(existsSync(resolve(target, "vendor/s11tnext/empty"))).toBe(true);
 		if (process.platform !== "win32") {
 			expect(statSync(resolve(target, "package.json")).mode & 0o777).toBe(0o640);
 			expect(statSync(resolve(target, "bun.lock")).mode & 0o777).toBe(0o600);
-			expect(statSync(resolve(target, "vendor/s11t/manifest.json")).mode & 0o777).toBe(0o600);
-			expect(statSync(resolve(target, "vendor/s11t/empty")).mode & 0o777).toBe(0o700);
+			expect(statSync(resolve(target, "vendor/s11tnext/manifest.json")).mode & 0o777).toBe(0o600);
+			expect(statSync(resolve(target, "vendor/s11tnext/empty")).mode & 0o777).toBe(0o700);
 		}
 		expect(() => assertManagedFilesRestored(target, state)).not.toThrow();
 	});
 
 	it("removes managed files that did not exist before deployment", () => {
-		const target = temporaryDirectory("s11t-deploy-target-");
-		const backup = temporaryDirectory("s11t-deploy-backup-");
+		const target = temporaryDirectory("s11tnext-deploy-target-");
+		const backup = temporaryDirectory("s11tnext-deploy-backup-");
 		writeFileSync(resolve(target, "package.json"), '{"name":"nightworkers"}\n');
 
 		const state = backupManagedFiles(target, backup);
 		writeFileSync(resolve(target, "bun.lock"), "generated lock\n");
-		mkdirSync(resolve(target, "vendor/s11t"), { recursive: true });
-		writeFileSync(resolve(target, "vendor/s11t/new.tgz"), "new tarball");
+		mkdirSync(resolve(target, "vendor/s11tnext"), { recursive: true });
+		writeFileSync(resolve(target, "vendor/s11tnext/new.tgz"), "new tarball");
 
 		restoreManagedFiles(target, backup, state);
 		expect(() => readFileSync(resolve(target, "bun.lock"), "utf8")).toThrow();
-		expect(() => readFileSync(resolve(target, "vendor/s11t/new.tgz"), "utf8")).toThrow();
+		expect(() => readFileSync(resolve(target, "vendor/s11tnext/new.tgz"), "utf8")).toThrow();
 		expect(() => assertManagedFilesRestored(target, state)).not.toThrow();
 	});
 
 	it.skipIf(process.platform === "win32")(
 		"rejects managed symlinks before taking a deployment backup",
 		() => {
-			const target = temporaryDirectory("s11t-deploy-symlink-target-");
-			const backup = temporaryDirectory("s11t-deploy-symlink-backup-");
-			const outside = temporaryDirectory("s11t-deploy-symlink-outside-");
+			const target = temporaryDirectory("s11tnext-deploy-symlink-target-");
+			const backup = temporaryDirectory("s11tnext-deploy-symlink-backup-");
+			const outside = temporaryDirectory("s11tnext-deploy-symlink-outside-");
 			const outsidePackage = resolve(outside, "package.json");
 			writeFileSync(outsidePackage, '{"name":"nightworkers","outside":true}\n');
 			symlinkSync(outsidePackage, resolve(target, "package.json"), "file");
@@ -302,9 +305,9 @@ describe("NightWorkers deployment rollback", () => {
 		deployNightWorkers({ target, verify: true }, dependencies);
 
 		const packageJson = JSON.parse(readFileSync(resolve(target, "package.json"), "utf8"));
-		expect(packageJson.dependencies["@s11t/runtime"]).toMatch(/^file:\.\/vendor\/s11t\//);
-		expect(packageJson.devDependencies["@s11t/cli"]).toMatch(/^file:\.\/vendor\/s11t\//);
-		expect(existsSync(resolve(target, "vendor/s11t/s11t-runtime-old.tgz"))).toBe(false);
+		expect(packageJson.dependencies["s11tnext"]).toMatch(/^file:\.\/vendor\/s11tnext\//);
+		expect(packageJson.devDependencies["s11tnext-cli"]).toMatch(/^file:\.\/vendor\/s11tnext\//);
+		expect(existsSync(resolve(target, "vendor/s11tnext/s11tnext-old.tgz"))).toBe(false);
 		expect(dependencies.checkpoints).toEqual(
 			expect.arrayContaining([
 				"source-release-dry-run",
@@ -321,7 +324,7 @@ describe("NightWorkers deployment rollback", () => {
 			dependencies.commands.some(
 				(entry) =>
 					(entry.command === "bun" || entry.command === "bun.exe") &&
-					entry.arguments.join(" ") === "run s11t --help",
+					entry.arguments.join(" ") === "run s11tnext --help",
 			),
 		).toBe(true);
 	});

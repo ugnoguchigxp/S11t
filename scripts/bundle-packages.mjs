@@ -22,7 +22,7 @@ const packageBuilds = {
 			resolve(repositoryRoot, "packages/cli/src/index.ts"),
 			resolve(repositoryRoot, "packages/cli/src/bin.ts"),
 		],
-		external: ["@s11t/runtime", "@s11t/runtime/compiler", "smol-toml"],
+		external: ["s11tnext", "s11tnext/compiler", "smol-toml"],
 		outdir: resolve(repositoryRoot, "packages/cli/dist"),
 		platform: "node",
 	},

@@ -5,13 +5,13 @@ does not authorize a publish; every registry-changing step below is a maintainer
 
 ## Current release contract
 
-- Public packages: `@s11t/runtime` and `@s11t/cli`.
+- Public packages: `s11tnext` and `s11tnext-cli`.
 - Both packages are a fixed Changesets group and must publish the same version.
 - `canary` is a commit-addressed snapshot and must never move `latest`.
 - `stable` is a normal SemVer version from the version PR and must publish from the exact `main` head.
 - `.github/workflows/release.yml` is the only npm publishing workflow.
 - Stable publishing remains disabled until the repository variable
-  `S11T_STABLE_RELEASE_ENABLED` is explicitly set to `true`.
+  `S11TNEXT_STABLE_RELEASE_ENABLED` is explicitly set to `true`.
 
 The workflow validates an immutable 40-character commit SHA, package metadata, registry uniqueness,
 tarball contents, an isolated ESM install, production dependency audit, registry dist-tags, signatures,
@@ -22,7 +22,7 @@ at the same commit.
 
 Before any dispatch:
 
-1. Confirm the maintainer or organization owns the `@s11t` npm scope and both package names are intended
+1. Confirm the maintainer owns the unscoped `s11tnext` and `s11tnext-cli` package names and both are intended
    to be public.
 2. Enable 2FA on every npm maintainer account.
 3. Protect `main` and require the CI matrix.
@@ -31,12 +31,11 @@ Before any dispatch:
    - `npm-bootstrap`: required reviewer; used once.
    - `npm-canary`: required reviewer appropriate for prereleases.
    - `npm-stable`: strict required reviewer; no self-approval if the repository plan supports it.
-6. Keep `S11T_STABLE_RELEASE_ENABLED` absent or `false` during bootstrap and canary validation.
+6. Keep `S11TNEXT_STABLE_RELEASE_ENABLED` absent or `false` during bootstrap and canary validation.
 7. Review package tarballs for secrets and unexpected files with `pnpm test:packages`.
 
-Scoped packages require public access on first publish. S11t records this in each package's
-`publishConfig`, and the dry-run also supplies `--access public`. See npm's
-[scoped public package guidance](https://docs.npmjs.com/creating-and-publishing-scoped-public-packages/).
+Both package names are unscoped and public. S11tnext records the public registry explicitly in each
+package's `publishConfig`, and the dry-run also supplies `--access public`.
 
 ## One-time bootstrap
 
@@ -73,13 +72,13 @@ the partial release in the GitHub issue or release log.
 ## Switch to Trusted Publishing
 
 After both package pages exist, configure the following Trusted Publisher separately on
-`@s11t/runtime` and `@s11t/cli`:
+`s11tnext` and `s11tnext-cli`:
 
 | npm field | value |
 | --- | --- |
 | Provider | GitHub Actions |
 | Organization or user | `ugnoguchigxp` |
-| Repository | `S11t` |
+| Repository | `s11tnext` |
 | Workflow filename | `release.yml` |
 | Environment name | leave blank |
 | Allowed actions | `npm publish` |
@@ -112,7 +111,7 @@ Do not delete the bootstrap token until one OIDC canary succeeds. Do not retain 
    do not use raw encoding.
 4. Run CI on the exact version commit and review `pnpm release:dry-run -- --channel stable` output from a
    clean checkout.
-5. Set `S11T_STABLE_RELEASE_ENABLED=true`.
+5. Set `S11TNEXT_STABLE_RELEASE_ENABLED=true`.
 6. Dispatch `Release` with the exact `main` SHA, `channel=stable`, and `confirm=publish-stable`.
 7. Approve `npm-stable`.
 8. Verify:
@@ -120,7 +119,7 @@ Do not delete the bootstrap token until one OIDC canary succeeds. Do not retain 
    - a fresh install and CLI invocation succeed;
    - registry signatures and provenance verify;
    - the annotated `v<version>` tag and GitHub Release point to the published commit.
-9. Set `S11T_STABLE_RELEASE_ENABLED=false` again if the gate is intended to remain one-shot.
+9. Set `S11TNEXT_STABLE_RELEASE_ENABLED=false` again if the gate is intended to remain one-shot.
 
 If npm publication succeeds but tag or GitHub Release creation fails, do not republish the immutable npm
 version. Rerun or repair only the `v<version>` tag/release after verifying it targets the exact published

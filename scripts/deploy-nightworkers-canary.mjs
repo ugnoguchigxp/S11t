@@ -29,7 +29,7 @@ export {
 
 const { sync: spawnSync } = crossSpawn;
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const packageNames = ["@s11t/runtime", "@s11t/cli"];
+const packageNames = ["s11tnext", "s11tnext-cli"];
 const pnpm = process.platform === "win32" ? "pnpm.cmd" : "pnpm";
 const bun = process.platform === "win32" ? "bun.exe" : "bun";
 
@@ -95,14 +95,14 @@ function assertNightWorkers(target) {
 		throw new Error(`${packagePath} does not describe the nightworkers package`);
 	}
 	if (realpathSync(target) === realpathSync(repositoryRoot)) {
-		throw new Error("The NightWorkers target cannot be the S11t repository");
+		throw new Error("The NightWorkers target cannot be the S11tnext repository");
 	}
 }
 
 function validateManifest(path, commit) {
 	const manifest = readJson(path);
 	if (!Array.isArray(manifest.packages)) {
-		throw new Error("The S11t package manifest has an unsupported shape");
+		throw new Error("The S11tnext package manifest has an unsupported shape");
 	}
 	if (
 		manifest.packages.length !== packageNames.length ||
@@ -110,20 +110,20 @@ function validateManifest(path, commit) {
 			(name) => manifest.packages.filter((entry) => entry?.name === name).length !== 1,
 		)
 	) {
-		throw new Error("The S11t package manifest must contain runtime and CLI exactly once");
+		throw new Error("The S11tnext package manifest must contain runtime and CLI exactly once");
 	}
 	const versions = new Set(manifest.packages.map((entry) => entry.version));
-	if (versions.size !== 1) throw new Error("The S11t canary packages have different versions");
+	if (versions.size !== 1) throw new Error("The S11tnext canary packages have different versions");
 	const version = [...versions][0];
 	if (typeof version !== "string" || !version.endsWith(`-canary-${commit}`)) {
-		throw new Error(`The S11t canary version does not match commit ${commit}`);
+		throw new Error(`The S11tnext canary version does not match commit ${commit}`);
 	}
 	for (const entry of manifest.packages) {
-		const expectedPrefix = `s11t-${entry.name.slice("@s11t/".length)}-`;
+		const expectedPrefix = `${entry.name}-`;
 		if (
 			typeof entry.file !== "string" ||
 			entry.file !== basename(entry.file) ||
-			!/^s11t-(?:runtime|cli)-[A-Za-z0-9._-]+\.tgz$/.test(entry.file) ||
+			!/^s11tnext(?:-cli)?-[A-Za-z0-9._-]+\.tgz$/.test(entry.file) ||
 			!entry.file.startsWith(expectedPrefix) ||
 			typeof entry.sha512 !== "string" ||
 			!/^[0-9a-f]{128}$/.test(entry.sha512)
@@ -135,7 +135,7 @@ function validateManifest(path, commit) {
 }
 
 function installManifest(target, artifactDirectory, manifest, version, commit) {
-	const vendorDirectory = resolve(target, "vendor/s11t");
+	const vendorDirectory = resolve(target, "vendor/s11tnext");
 	mkdirSync(vendorDirectory, { recursive: true });
 	for (const entry of manifest.packages) {
 		const source = resolve(artifactDirectory, entry.file);
@@ -145,22 +145,22 @@ function installManifest(target, artifactDirectory, manifest, version, commit) {
 		cpSync(source, resolve(vendorDirectory, entry.file));
 	}
 	writeJson(resolve(vendorDirectory, "manifest.json"), manifest);
-	const runtime = manifest.packages.find((entry) => entry.name === "@s11t/runtime");
-	const cli = manifest.packages.find((entry) => entry.name === "@s11t/cli");
-	const readme = `# Vendored S11t canary
+	const runtime = manifest.packages.find((entry) => entry.name === "s11tnext");
+	const cli = manifest.packages.find((entry) => entry.name === "s11tnext-cli");
+	const readme = `# Vendored S11tnext canary
 
-This directory is managed by S11t's \`pnpm deploy:nightworkers-canary\` command.
+This directory is managed by S11tnext's \`pnpm deploy:nightworkers-canary\` command.
 NightWorkers consumes these immutable tarballs through root \`file:\` dependencies.
 The runtime override is required so Bun resolves the CLI's transitive runtime
 dependency from the same tarball instead of querying the npm registry.
 
 - Version: \`${version}\`
-- S11t commit: \`${commit}\`
+- S11tnext commit: \`${commit}\`
 - Runtime SHA-512: \`${runtime.sha512}\`
 - CLI SHA-512: \`${cli.sha512}\`
 - Supported Node.js versions: \`^20.19.0 || ^22.0.0 || ^24.0.0\`
 
-The tarballs passed S11t's release dry-run, package-content allowlist, isolated
+The tarballs passed S11tnext's release dry-run, package-content allowlist, isolated
 ESM consumer, type, runtime, CLI, and production dependency audit gates before
 being copied here. Keep the exact version pinned during dogfooding.
 `;
@@ -171,9 +171,9 @@ being copied here. Keep the exact version pinned during dogfooding.
 	packageJson.dependencies ??= {};
 	packageJson.devDependencies ??= {};
 	packageJson.overrides ??= {};
-	packageJson.dependencies["@s11t/runtime"] = `file:./vendor/s11t/${runtime.file}`;
-	packageJson.devDependencies["@s11t/cli"] = `file:./vendor/s11t/${cli.file}`;
-	packageJson.overrides["@s11t/runtime"] = `file:./vendor/s11t/${runtime.file}`;
+	packageJson.dependencies["s11tnext"] = `file:./vendor/s11tnext/${runtime.file}`;
+	packageJson.devDependencies["s11tnext-cli"] = `file:./vendor/s11tnext/${cli.file}`;
+	packageJson.overrides["s11tnext"] = `file:./vendor/s11tnext/${runtime.file}`;
 	writeJson(packagePath, packageJson, "\t");
 	return { runtime, cli };
 }
@@ -191,11 +191,8 @@ function verifyNightWorkers(
 	checkpoint("target-install");
 	execute(bun, ["install", "--frozen-lockfile", "--ignore-scripts"], target);
 	checkpoint("target-frozen-install");
-	for (const [entry, directory] of [
-		[runtime, "runtime"],
-		[cli, "cli"],
-	]) {
-		const installed = readJson(resolve(target, `node_modules/@s11t/${directory}/package.json`));
+	for (const entry of [runtime, cli]) {
+		const installed = readJson(resolve(target, `node_modules/${entry.name}/package.json`));
 		if (installed.name !== entry.name || installed.version !== version) {
 			throw new Error(`${entry.name}@${version} was not installed from the vendored tarball`);
 		}
@@ -205,7 +202,7 @@ function verifyNightWorkers(
 	}
 	const lock = readFileSync(resolve(target, "bun.lock"), "utf8");
 	for (const entry of [runtime, cli]) {
-		if (!lock.includes(`${entry.name}@./vendor/s11t/${entry.file}`)) {
+		if (!lock.includes(`${entry.name}@./vendor/s11tnext/${entry.file}`)) {
 			throw new Error(`${entry.name} is not pinned to its vendored tarball in bun.lock`);
 		}
 	}
@@ -214,12 +211,12 @@ function verifyNightWorkers(
 		[
 			"--input-type=module",
 			"--eval",
-			`import { COMPILER_VERSION } from "@s11t/runtime/compiler"; if (COMPILER_VERSION !== ${JSON.stringify(version)}) throw new Error(\`Unexpected compiler version: \${COMPILER_VERSION}\`);`,
+			`import { COMPILER_VERSION } from "s11tnext/compiler"; if (COMPILER_VERSION !== ${JSON.stringify(version)}) throw new Error(\`Unexpected compiler version: \${COMPILER_VERSION}\`);`,
 		],
 		target,
 	);
 	checkpoint("target-runtime-import");
-	execute(bun, ["run", "s11t", "--help"], target);
+	execute(bun, ["run", "s11tnext", "--help"], target);
 	checkpoint("target-cli-help");
 	if (fullVerification) {
 		execute(bun, ["run", "typecheck"], target);
@@ -230,9 +227,9 @@ function verifyNightWorkers(
 }
 
 function pruneOldTarballs(target, keep) {
-	const vendorDirectory = resolve(target, "vendor/s11t");
+	const vendorDirectory = resolve(target, "vendor/s11tnext");
 	for (const file of readdirSync(vendorDirectory)) {
-		if (/^s11t-(?:runtime|cli)-.+\.tgz$/.test(file) && !keep.has(file)) {
+		if (/^s11tnext(?:-cli)?-.+\.tgz$/.test(file) && !keep.has(file)) {
 			rmSync(resolve(vendorDirectory, file));
 		}
 	}
@@ -248,15 +245,15 @@ export function deployNightWorkers(
 ) {
 	assertNightWorkers(target);
 	const commit = captured("git", ["rev-parse", "HEAD"], repositoryRoot);
-	if (!/^[0-9a-f]{40}$/.test(commit)) throw new Error("S11t HEAD is not a full Git commit SHA");
+	if (!/^[0-9a-f]{40}$/.test(commit)) throw new Error("S11tnext HEAD is not a full Git commit SHA");
 	const sourceStatus = captured("git", ["status", "--porcelain"], repositoryRoot);
 	if (sourceStatus !== "") {
 		process.stderr.write(
-			"S11t has uncommitted changes; deployment intentionally uses the committed HEAD only.\n",
+			"S11tnext has uncommitted changes; deployment intentionally uses the committed HEAD only.\n",
 		);
 	}
 
-	const temporaryRoot = mkdtempSync(resolve(tmpdir(), "s11t-nightworkers-deploy-"));
+	const temporaryRoot = mkdtempSync(resolve(tmpdir(), "s11tnext-nightworkers-deploy-"));
 	const worktree = resolve(temporaryRoot, "source");
 	const backupRoot = resolve(temporaryRoot, "backup");
 	let worktreeRegistered = false;
@@ -297,7 +294,7 @@ export function deployNightWorkers(
 		pruneOldTarballs(target, new Set([runtime.file, cli.file]));
 		checkpoint("target-pruned");
 		process.stdout.write(
-			`Deployed S11t ${version} from ${commit} to ${relative(dirname(target), target)}.\n`,
+			`Deployed S11tnext ${version} from ${commit} to ${relative(dirname(target), target)}.\n`,
 		);
 	} catch (error) {
 		if (targetMutated && backupState !== undefined) {

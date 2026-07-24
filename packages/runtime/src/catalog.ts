@@ -17,9 +17,9 @@ import type {
 	TextRenderer,
 	TextRendererObject,
 } from "./catalog-types.js";
-import { S11tError } from "./diagnostics.js";
+import { S11tnextError } from "./diagnostics.js";
 import { createRequestCatalog } from "./request-audit.js";
-import type { JsonValue, S11tCatalogArtifact } from "./types.js";
+import type { JsonValue, S11tnextCatalogArtifact } from "./types.js";
 
 export { assertCatalogIntegrity };
 export type {
@@ -39,7 +39,7 @@ export type {
 } from "./catalog-types.js";
 
 function bindInvocation<C extends DefaultContract>(
-	artifact: S11tCatalogArtifact,
+	artifact: S11tnextCatalogArtifact,
 	binding: CatalogBinding,
 ): ReturnType<Catalog<C>["bind"]> {
 	const snapshot = validateBinding(binding);
@@ -63,7 +63,7 @@ function textRenderer<C extends DefaultContract>(
 }
 
 function createCatalogBase<C extends DefaultContract = DefaultContract>(
-	input: S11tCatalogArtifact,
+	input: S11tnextCatalogArtifact,
 	options: { expectedCatalogDigest?: string } = {},
 ): Catalog<C> {
 	assertCatalogIntegrity(input);
@@ -75,7 +75,7 @@ function createCatalogBase<C extends DefaultContract = DefaultContract>(
 	}
 	const artifact = deepFreeze(
 		cloneJson(input as unknown as JsonValue),
-	) as unknown as S11tCatalogArtifact;
+	) as unknown as S11tnextCatalogArtifact;
 	const descriptions = deepFreeze(
 		Object.values(artifact.contexts)
 			.sort((left, right) => compareCodeUnits(left.key, right.key))
@@ -129,8 +129,8 @@ function createCatalogBase<C extends DefaultContract = DefaultContract>(
 				(description) => description.key === contextKey,
 			);
 			if (result === undefined) {
-				throw new S11tError(
-					"S11T_CONTEXT_NOT_FOUND",
+				throw new S11tnextError(
+					"S11TNEXT_CONTEXT_NOT_FOUND",
 					`Context not found: ${contextKey}`,
 					[contextKey],
 				);

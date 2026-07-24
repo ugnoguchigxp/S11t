@@ -1,23 +1,23 @@
 {
-  "name": "@s11t/cli",
+  "name": "s11tnext-cli",
   "version": "0.0.0",
-  "description": "TOML authoring and build CLI for S11t",
+  "description": "TOML authoring and build CLI for S11tnext",
   "keywords": ["llm", "prompt", "system-context", "prompt-management", "cli"],
   "type": "module",
   "types": "./dist/index.d.ts",
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/ugnoguchigxp/S11t.git",
+    "url": "git+https://github.com/ugnoguchigxp/s11tnext.git",
     "directory": "packages/cli"
   },
-  "homepage": "https://github.com/ugnoguchigxp/S11t/tree/main/packages/cli#readme",
+  "homepage": "https://github.com/ugnoguchigxp/s11tnext/tree/main/packages/cli#readme",
   "bugs": {
-    "url": "https://github.com/ugnoguchigxp/S11t/issues"
+    "url": "https://github.com/ugnoguchigxp/s11tnext/issues"
   },
   "files": ["bin", "dist", "README.md", "LICENSE", "NOTICE"],
   "bin": {
-    "s11t": "./bin/s11t.js"
+    "s11tnext": "./bin/s11tnext.js"
   },
   "exports": {
     ".": {
@@ -38,7 +38,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@s11t/runtime": "workspace:*",
+    "s11tnext": "workspace:*",
     "smol-toml": "1.7.0"
   }
 }

@@ -16,15 +16,15 @@ export type {
 	TextRendererObject,
 } from "./catalog.js";
 export { hashRendered, verifyRenderedHash } from "./hash.js";
-export type { S11tDigest } from "./hash.js";
-export { S11tError } from "./diagnostics.js";
-export type { S11tErrorCode } from "./diagnostics.js";
+export type { S11tnextDigest } from "./hash.js";
+export { S11tnextError } from "./diagnostics.js";
+export type { S11tnextErrorCode } from "./diagnostics.js";
 export type {
 	JsonValue,
-	S11tCatalogArtifact,
-	S11tCompiledContext,
-	S11tCompiledLocale,
-	S11tCompiledSection,
-	S11tCompiledVariable,
+	S11tnextCatalogArtifact,
+	S11tnextCompiledContext,
+	S11tnextCompiledLocale,
+	S11tnextCompiledSection,
+	S11tnextCompiledVariable,
 	TemplateSegment,
 } from "./types.js";

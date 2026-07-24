@@ -1,7 +1,7 @@
 export { parseAndResolveAuthoring, validateResolvedDocuments } from "./authoring.js";
 export type { ResolvedAuthoringDocument } from "./authoring.js";
 export { parseProjectConfig } from "./config.js";
-export type { S11tProjectConfig } from "./config.js";
+export type { S11tnextProjectConfig } from "./config.js";
 export { buildProject } from "./build-command.js";
 export { compileProject } from "./compile-source.js";
 export { loadProject } from "./discover.js";
@@ -10,5 +10,5 @@ export { inspectContext, inspectCoverage } from "./inspect-command.js";
 export type { LocaleCoverageResult } from "./inspect-command.js";
 export { lintProject } from "./lint-command.js";
 export { runCli } from "./main.js";
-export { S11tDiagnosticError } from "./diagnostics.js";
-export type { S11tDiagnostic } from "./diagnostics.js";
+export { S11tnextDiagnosticError } from "./diagnostics.js";
+export type { S11tnextDiagnostic } from "./diagnostics.js";

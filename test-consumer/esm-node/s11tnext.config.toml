@@ -1,5 +1,5 @@
 source_dir = "contexts"
-out_dir = ".s11t"
+out_dir = ".s11tnext"
 
 [authoring]
 source_locale = "ja-JP"

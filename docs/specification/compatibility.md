@@ -5,12 +5,12 @@ from the repository are development contracts and may change without compatibili
 
 ## Versioned surfaces
 
-S11t treats the following as public compatibility surfaces:
+S11tnext treats the following as public compatibility surfaces:
 
-- exports from `@s11t/runtime` and `@s11t/runtime/compiler`;
-- exports and command-line behavior from `@s11t/cli`;
-- `s11t.config.toml` and `.context.toml` authoring formats;
-- `schemas/s11t-authoring.schema.json` and `schemas/s11t-artifact.schema.json`;
+- exports from `s11tnext` and `s11tnext/compiler`;
+- exports and command-line behavior from `s11tnext-cli`;
+- `s11tnext.config.toml` and `.context.toml` authoring formats;
+- `schemas/s11tnext-authoring.schema.json` and `schemas/s11tnext-artifact.schema.json`;
 - generated `catalog.json` and `catalog.generated.ts` files;
 - documented diagnostic codes, JSON output fields, and process exit codes.
 
@@ -18,7 +18,7 @@ Internal source modules that are not reachable through package `exports` are not
 
 ## Compatibility matrix
 
-`@s11t/runtime` and `@s11t/cli` are a fixed Changesets release group and always publish the same
+`s11tnext` and `s11tnext-cli` are a fixed Changesets release group and always publish the same
 version.
 
 | Producer | Consumer | Support |
@@ -67,10 +67,10 @@ replacement or mitigation when one exists.
 ## Upgrade and migration procedure
 
 1. Read both package changelogs and the release Changeset.
-2. Upgrade `@s11t/runtime` and `@s11t/cli` to the same exact version.
-3. Run `s11t lint` and `s11t build` with every deployed release profile.
+2. Upgrade `s11tnext` and `s11tnext-cli` to the same exact version.
+3. Run `s11tnext lint` and `s11tnext build` with every deployed release profile.
 4. Commit the regenerated `catalog.json` and `catalog.generated.ts` together.
-5. Run application type checking, tests, and `s11t inspect --coverage` for required locales.
+5. Run application type checking, tests, and `s11tnext inspect --coverage` for required locales.
 6. Exercise the release in a canary environment before production.
 
 Do not hand-edit generated artifacts or carry an old generated TypeScript file beside a newly generated

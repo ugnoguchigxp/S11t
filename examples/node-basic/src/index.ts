@@ -1,9 +1,9 @@
 import { readFileSync } from "node:fs";
 
-import { createAppCatalog } from "../.s11t/catalog.generated.js";
+import { createAppCatalog } from "../.s11tnext/catalog.generated.js";
 
 const artifact: unknown = JSON.parse(
-	readFileSync(new URL("../../.s11t/catalog.json", import.meta.url), "utf8"),
+	readFileSync(new URL("../../.s11tnext/catalog.json", import.meta.url), "utf8"),
 );
 const catalog = createAppCatalog(artifact);
 const p = catalog.bind({ instructionLocale: "ja-JP", fallbackLocales: ["en-US"] });

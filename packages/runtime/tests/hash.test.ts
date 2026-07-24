@@ -10,7 +10,7 @@ import {
 	hashPolicy,
 	hashRelease,
 } from "../src/hash.js";
-import type { S11tCompiledSection } from "../src/types.js";
+import type { S11tnextCompiledSection } from "../src/types.js";
 
 type Golden = {
 	definitionHash: string;
@@ -51,7 +51,7 @@ const definition: CanonicalContextDefinition = {
 	],
 };
 
-const sections: Record<string, S11tCompiledSection[]> = {
+const sections: Record<string, S11tnextCompiledSection[]> = {
 	"en-US": [
 		{
 			id: "context.text",

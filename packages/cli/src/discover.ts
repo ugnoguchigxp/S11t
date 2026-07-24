@@ -6,8 +6,8 @@ import {
 	validateResolvedDocuments,
 	type ResolvedAuthoringDocument,
 } from "./authoring.js";
-import { parseProjectConfig, type S11tProjectConfig } from "./config.js";
-import { S11tDiagnosticError, type S11tDiagnostic } from "./diagnostics.js";
+import { parseProjectConfig, type S11tnextProjectConfig } from "./config.js";
+import { S11tnextDiagnosticError, type S11tnextDiagnostic } from "./diagnostics.js";
 import { resolvesWithin } from "./path-safety.js";
 import { loadToml } from "./toml-loader.js";
 
@@ -15,7 +15,7 @@ export type LoadedProject = {
 	configPath: string;
 	configDirectory: string;
 	sourceFiles: string[];
-	config: S11tProjectConfig;
+	config: S11tnextProjectConfig;
 	documents: ResolvedAuthoringDocument[];
 	releaseProfile: string;
 };
@@ -29,8 +29,8 @@ function posix(path: string): string {
 }
 
 function diagnostic(code: string, message: string, file: string, path: Array<string | number> = []): never {
-	const value: S11tDiagnostic = { code, severity: "error", message, file, path };
-	throw new S11tDiagnosticError([value]);
+	const value: S11tnextDiagnostic = { code, severity: "error", message, file, path };
+	throw new S11tnextDiagnosticError([value]);
 }
 
 function discoverFiles(directory: string, configDirectory: string): string[] {
@@ -56,37 +56,37 @@ export function loadProject(
 	releaseProfile?: string,
 	options: { validateRequiredCoverage?: boolean } = {},
 ): LoadedProject {
-	const configPath = resolve(cwd, configArgument ?? "s11t.config.toml");
+	const configPath = resolve(cwd, configArgument ?? "s11tnext.config.toml");
 	const configDirectory = dirname(configPath);
-	const configDisplay = posix(relative(cwd, configPath)) || "s11t.config.toml";
+	const configDisplay = posix(relative(cwd, configPath)) || "s11tnext.config.toml";
 	const config = parseProjectConfig(loadToml(configPath, configDisplay), configDisplay);
 	const sourceDirectory = resolve(configDirectory, config.sourceDir);
 	const relativeSource = relative(configDirectory, sourceDirectory);
 	if (isAbsolute(relativeSource) || relativeSource === ".." || relativeSource.startsWith(`..${sep}`)) {
-		diagnostic("S11T_CONFIG_INVALID", "source_dir escapes the config directory", configDisplay, ["source_dir"]);
+		diagnostic("S11TNEXT_CONFIG_INVALID", "source_dir escapes the config directory", configDisplay, ["source_dir"]);
 	}
 	if (!existsSync(sourceDirectory)) {
-		diagnostic("S11T_SOURCE_DIR_NOT_FOUND", "Configured source_dir does not exist", configDisplay, ["source_dir"]);
+		diagnostic("S11TNEXT_SOURCE_DIR_NOT_FOUND", "Configured source_dir does not exist", configDisplay, ["source_dir"]);
 	}
 	if (!statSync(sourceDirectory).isDirectory()) {
-		diagnostic("S11T_CONFIG_INVALID", "Configured source_dir is not a directory", configDisplay, ["source_dir"]);
+		diagnostic("S11TNEXT_CONFIG_INVALID", "Configured source_dir is not a directory", configDisplay, ["source_dir"]);
 	}
 	if (!resolvesWithin(configDirectory, sourceDirectory)) {
-		diagnostic("S11T_CONFIG_INVALID", "source_dir resolves outside the config directory", configDisplay, ["source_dir"]);
+		diagnostic("S11TNEXT_CONFIG_INVALID", "source_dir resolves outside the config directory", configDisplay, ["source_dir"]);
 	}
 	const outputDirectory = resolve(configDirectory, config.outDir);
 	if (!resolvesWithin(configDirectory, outputDirectory)) {
-		diagnostic("S11T_CONFIG_INVALID", "out_dir resolves outside the config directory", configDisplay, ["out_dir"]);
+		diagnostic("S11TNEXT_CONFIG_INVALID", "out_dir resolves outside the config directory", configDisplay, ["out_dir"]);
 	}
 	if (existsSync(outputDirectory) && !statSync(outputDirectory).isDirectory()) {
-		diagnostic("S11T_CONFIG_INVALID", "Configured out_dir is not a directory", configDisplay, ["out_dir"]);
+		diagnostic("S11TNEXT_CONFIG_INVALID", "Configured out_dir is not a directory", configDisplay, ["out_dir"]);
 	}
 	const absoluteFiles = discoverFiles(sourceDirectory, configDirectory);
 	if (absoluteFiles.length === 0) {
-		diagnostic("S11T_SOURCE_EMPTY", "No .context.toml files were found", configDisplay, ["source_dir"]);
+		diagnostic("S11TNEXT_SOURCE_EMPTY", "No .context.toml files were found", configDisplay, ["source_dir"]);
 	}
 	if (releaseProfile === undefined) {
-		diagnostic("S11T_RELEASE_PROFILE_REQUIRED", "--release-profile is required", configDisplay, ["release_profiles"]);
+		diagnostic("S11TNEXT_RELEASE_PROFILE_REQUIRED", "--release-profile is required", configDisplay, ["release_profiles"]);
 	}
 	const sourceFiles = absoluteFiles.map((file) => posix(relative(configDirectory, file)));
 	const documents = absoluteFiles.map((file, index) => {

@@ -6,6 +6,6 @@
     "tsBuildInfoFile": "../../.tsbuildinfo/example-node-basic.tsbuildinfo",
     "types": ["node"]
   },
-  "include": ["src/**/*.ts", ".s11t/catalog.generated.ts"],
+  "include": ["src/**/*.ts", ".s11tnext/catalog.generated.ts"],
   "references": [{ "path": "../../packages/runtime" }]
 }

@@ -12,7 +12,7 @@ const artifactDirectory = resolve(repositoryRoot, ".artifacts/packages");
 const manifest = JSON.parse(readFileSync(resolve(artifactDirectory, "manifest.json"), "utf8"));
 const npm = process.platform === "win32" ? "npm.cmd" : "npm";
 const node = process.execPath;
-const temporary = mkdtempSync(join(tmpdir(), "s11t-consumer-"));
+const temporary = mkdtempSync(join(tmpdir(), "s11tnext-consumer-"));
 
 function run(command, arguments_, options = {}) {
 	const result = spawnSync(command, arguments_, {
@@ -50,13 +50,13 @@ try {
 		throw new Error("Consumer lockfile references the workspace");
 	}
 	const dependencyTree = JSON.parse(
-		run(npm, ["ls", "@s11t/runtime", "@s11t/cli", "--json", "--all"]),
+		run(npm, ["ls", "s11tnext", "s11tnext-cli", "--json", "--all"]),
 	);
-	if (dependencyTree.dependencies?.["@s11t/runtime"] === undefined) {
-		throw new Error("Consumer did not install @s11t/runtime");
+	if (dependencyTree.dependencies?.["s11tnext"] === undefined) {
+		throw new Error("Consumer did not install s11tnext");
 	}
-	if (dependencyTree.dependencies?.["@s11t/cli"] === undefined) {
-		throw new Error("Consumer did not install @s11t/cli");
+	if (dependencyTree.dependencies?.["s11tnext-cli"] === undefined) {
+		throw new Error("Consumer did not install s11tnext-cli");
 	}
 	for (const entry of manifest.packages) {
 		if (dependencyTree.dependencies?.[entry.name]?.version !== entry.version) {
@@ -66,14 +66,14 @@ try {
 		}
 	}
 
-	const binName = process.platform === "win32" ? "s11t.cmd" : "s11t";
+	const binName = process.platform === "win32" ? "s11tnext.cmd" : "s11tnext";
 	if (!existsSync(resolve(temporary, "node_modules/.bin", binName))) {
-		throw new Error("Consumer has no local s11t binary");
+		throw new Error("Consumer has no local s11tnext binary");
 	}
-	run(npm, ["exec", "--", "s11t", "--help"]);
-	run(npm, ["exec", "--", "s11t", "lint", "--release-profile", "development"]);
-	run(npm, ["exec", "--", "s11t", "build", "--release-profile", "development"]);
-	run(npm, ["exec", "--", "s11t", "build", "--check", "--release-profile", "development"]);
+	run(npm, ["exec", "--", "s11tnext", "--help"]);
+	run(npm, ["exec", "--", "s11tnext", "lint", "--release-profile", "development"]);
+	run(npm, ["exec", "--", "s11tnext", "build", "--release-profile", "development"]);
+	run(npm, ["exec", "--", "s11tnext", "build", "--check", "--release-profile", "development"]);
 	run(npm, ["exec", "--", "tsc", "-p", "tsconfig.json", "--pretty", "false"]);
 	const output = run(node, ["dist/src/index.js"]);
 	const result = JSON.parse(output);
@@ -123,7 +123,7 @@ try {
 	}
 	process.stdout.write(`Isolated ESM consumer passed for ${expectedVersion}.\n`);
 } finally {
-	if (process.env.S11T_KEEP_CONSUMER_TMP === "1") {
+	if (process.env.S11TNEXT_KEEP_CONSUMER_TMP === "1") {
 		process.stdout.write(`Consumer workspace retained at ${temporary}.\n`);
 	} else {
 		rmSync(temporary, { recursive: true, force: true });

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { createCatalog } from "../src/catalog.js";
 import { compileCatalog, type CanonicalContextDefinition } from "../src/compiler.js";
-import { S11tError } from "../src/diagnostics.js";
+import { S11tnextError } from "../src/diagnostics.js";
 
 function context(
 	key: string,
@@ -47,7 +47,7 @@ function catalog() {
 			],
 			{
 				releaseProfile: "test",
-				provenance: { configPath: "s11t.config.toml", sourceFiles: ["contexts/all.context.toml"] },
+				provenance: { configPath: "s11tnext.config.toml", sourceFiles: ["contexts/all.context.toml"] },
 			},
 		),
 	).bind({ instructionLocale: "en-US" });
@@ -68,7 +68,7 @@ describe("runtime encoding", () => {
 
 	it.each([Number.NaN, Number.POSITIVE_INFINITY, "1"])("rejects invalid number %s", (value) => {
 		expect(() => catalog()("encoding.number", { value })).toThrowError(
-			expect.objectContaining<S11tError>({ code: "S11T_VALUE_INVALID" }),
+			expect.objectContaining<S11tnextError>({ code: "S11TNEXT_VALUE_INVALID" }),
 		);
 	});
 
@@ -82,20 +82,20 @@ describe("runtime encoding", () => {
 		const value: Record<string, unknown> = {};
 		value.self = value;
 		expect(() => catalog()("encoding.json", { value })).toThrowError(
-			expect.objectContaining<S11tError>({ code: "S11T_VALUE_INVALID" }),
+			expect.objectContaining<S11tnextError>({ code: "S11TNEXT_VALUE_INVALID" }),
 		);
 	});
 
 	it("rejects sparse arrays and accessors as non-deterministic JSON values", () => {
 		expect(() => catalog()("encoding.json", { value: new Array(1) })).toThrowError(
-			expect.objectContaining<S11tError>({ code: "S11T_VALUE_INVALID" }),
+			expect.objectContaining<S11tnextError>({ code: "S11TNEXT_VALUE_INVALID" }),
 		);
 		const value = Object.defineProperty({}, "dynamic", {
 			enumerable: true,
 			get: () => "value",
 		});
 		expect(() => catalog()("encoding.json", { value })).toThrowError(
-			expect.objectContaining<S11tError>({ code: "S11T_VALUE_INVALID" }),
+			expect.objectContaining<S11tnextError>({ code: "S11TNEXT_VALUE_INVALID" }),
 		);
 	});
 
@@ -106,7 +106,7 @@ describe("runtime encoding", () => {
 			compileCatalog([definition], {
 				releaseProfile: "test",
 				provenance: {
-					configPath: "s11t.config.toml",
+					configPath: "s11tnext.config.toml",
 					sourceFiles: ["contexts/once.context.toml"],
 				},
 			}),

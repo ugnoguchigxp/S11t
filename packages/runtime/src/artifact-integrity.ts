@@ -7,7 +7,7 @@ import type {
 	CanonicalContextDefinition,
 	CanonicalSectionDefinition,
 } from "./canonical-definition.js";
-import { S11tError } from "./diagnostics.js";
+import { S11tnextError } from "./diagnostics.js";
 import {
 	hashArtifact,
 	hashCatalog,
@@ -15,14 +15,14 @@ import {
 	hashPolicy,
 	hashRelease,
 } from "./hash.js";
-import type { S11tCatalogArtifact, S11tCompiledContext } from "./types.js";
+import type { S11tnextCatalogArtifact, S11tnextCompiledContext } from "./types.js";
 
 function definitionFromCompiled(
-	context: S11tCompiledContext,
+	context: S11tnextCompiledContext,
 ): CanonicalContextDefinition {
 	const availableLocales = Object.keys(context.locales).sort(compareCodeUnits);
 	if (availableLocales.length === 0) {
-		throw new S11tError("S11T_ARTIFACT_INVALID", "locales cannot be empty", [
+		throw new S11tnextError("S11TNEXT_ARTIFACT_INVALID", "locales cannot be empty", [
 			"contexts",
 			context.key,
 			"locales",
@@ -30,7 +30,7 @@ function definitionFromCompiled(
 	}
 	const sourceSections = context.locales[context.sourceLocale]?.sections;
 	if (sourceSections === undefined) {
-		throw new S11tError("S11T_ARTIFACT_INVALID", "Locale is missing", [
+		throw new S11tnextError("S11TNEXT_ARTIFACT_INVALID", "Locale is missing", [
 			"contexts",
 			context.key,
 			"locales",
@@ -51,8 +51,8 @@ function definitionFromCompiled(
 					candidate.enforcement !== section.enforcement ||
 					candidate.optimizable !== section.optimizable
 				) {
-					throw new S11tError(
-						"S11T_ARTIFACT_INVALID",
+					throw new S11tnextError(
+						"S11TNEXT_ARTIFACT_INVALID",
 						"Locale section metadata does not match",
 						["contexts", context.key, "locales", locale, "sections", sectionIndex],
 					);
@@ -81,7 +81,7 @@ function definitionFromCompiled(
 }
 
 function variableNames(
-	segments: S11tCompiledContext["locales"][string]["sections"][number]["segments"],
+	segments: S11tnextCompiledContext["locales"][string]["sections"][number]["segments"],
 ): Set<string> {
 	return new Set(
 		segments.flatMap((segment) =>
@@ -97,28 +97,28 @@ function sameNames(left: Set<string>, right: Set<string>): boolean {
 	);
 }
 
-export function assertCatalogIntegrity(artifact: S11tCatalogArtifact): void {
+export function assertCatalogIntegrity(artifact: S11tnextCatalogArtifact): void {
 	const releaseDigests: Record<string, string> = {};
 	const requiredLocales: Record<string, string[]> = {};
 	for (const [key, context] of Object.entries(artifact.contexts)) {
 		if (key !== context.key) {
-			throw new S11tError(
-				"S11T_ARTIFACT_INVALID",
+			throw new S11tnextError(
+				"S11TNEXT_ARTIFACT_INVALID",
 				"Context map key must match context key",
 				["contexts", key, "key"],
 			);
 		}
 		const localeKeys = Object.keys(context.locales).sort(compareCodeUnits);
 		if (!localeKeys.includes(context.sourceLocale)) {
-			throw new S11tError(
-				"S11T_ARTIFACT_INVALID",
+			throw new S11tnextError(
+				"S11TNEXT_ARTIFACT_INVALID",
 				"sourceLocale must be compiled",
 				["contexts", key, "sourceLocale"],
 			);
 		}
 		if (context.requiredLocales.some((locale) => !localeKeys.includes(locale))) {
-			throw new S11tError(
-				"S11T_ARTIFACT_INVALID",
+			throw new S11tnextError(
+				"S11TNEXT_ARTIFACT_INVALID",
 				"Every required locale must be compiled",
 				["contexts", key, "locales"],
 			);
@@ -133,8 +133,8 @@ export function assertCatalogIntegrity(artifact: S11tCatalogArtifact): void {
 			for (const [sectionIndex, section] of compiledLocale.sections.entries()) {
 				if (locale === context.sourceLocale) {
 					if (sectionIds.has(section.id)) {
-						throw new S11tError(
-							"S11T_ARTIFACT_INVALID",
+						throw new S11tnextError(
+							"S11TNEXT_ARTIFACT_INVALID",
 							"Section IDs must be unique",
 							[
 								"contexts",
@@ -152,8 +152,8 @@ export function assertCatalogIntegrity(artifact: S11tCatalogArtifact): void {
 				for (const [segmentIndex, segment] of section.segments.entries()) {
 					if (segment.type === "variable") {
 						if (!Object.hasOwn(context.variables, segment.name)) {
-							throw new S11tError(
-								"S11T_ARTIFACT_INVALID",
+							throw new S11tnextError(
+								"S11TNEXT_ARTIFACT_INVALID",
 								"Segment references an undeclared variable",
 								[
 									"contexts",
@@ -178,8 +178,8 @@ export function assertCatalogIntegrity(artifact: S11tCatalogArtifact): void {
 						variableNames(section.segments),
 					)
 				) {
-					throw new S11tError(
-						"S11T_ARTIFACT_INVALID",
+					throw new S11tnextError(
+						"S11TNEXT_ARTIFACT_INVALID",
 						"Translation placeholders must match the source locale",
 						[
 							"contexts",
@@ -208,8 +208,8 @@ export function assertCatalogIntegrity(artifact: S11tCatalogArtifact): void {
 		}
 		for (const variableName of Object.keys(context.variables)) {
 			if (!referencedVariables.has(variableName)) {
-				throw new S11tError(
-					"S11T_ARTIFACT_INVALID",
+				throw new S11tnextError(
+					"S11TNEXT_ARTIFACT_INVALID",
 					"Every variable must be referenced",
 					["contexts", key, "variables", variableName],
 				);

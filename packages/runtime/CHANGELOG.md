@@ -1,4 +1,4 @@
-# @s11t/runtime
+# s11tnext
 
 ## 0.0.0
 

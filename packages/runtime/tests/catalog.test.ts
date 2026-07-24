@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
 	createCatalog,
 	hashRendered,
-	S11tError,
+	S11tnextError,
 	verifyRenderedHash,
 } from "../src/index.js";
 import { compileCatalog, type CanonicalContextDefinition } from "../src/compiler.js";
@@ -33,7 +33,7 @@ function artifact() {
 	return compileCatalog([definition()], {
 		releaseProfile: "production",
 		provenance: {
-			configPath: "s11t.config.toml",
+			configPath: "s11tnext.config.toml",
 			sourceFiles: ["contexts/codingAgent/role-instructions.context.toml"],
 		},
 	});
@@ -60,7 +60,7 @@ function japaneseOnlyArtifact() {
 	japaneseOnly.sections[0]!.locales = { "ja-JP": "日本語" };
 	return compileCatalog([japaneseOnly], {
 		releaseProfile: "development",
-		provenance: { configPath: "s11t.config.toml", sourceFiles: ["contexts/a.context.toml"] },
+		provenance: { configPath: "s11tnext.config.toml", sourceFiles: ["contexts/a.context.toml"] },
 	});
 }
 
@@ -74,7 +74,7 @@ function compoundArtifact() {
 	return compileCatalog([definition(), provider], {
 		releaseProfile: "production",
 		provenance: {
-			configPath: "s11t.config.toml",
+			configPath: "s11tnext.config.toml",
 			sourceFiles: ["contexts/role.context.toml", "contexts/provider.context.toml"],
 		},
 	});
@@ -84,20 +84,20 @@ function errorCode(action: () => unknown): string {
 	try {
 		action();
 	} catch (error) {
-		if (error instanceof S11tError) return error.code;
+		if (error instanceof S11tnextError) return error.code;
 		throw error;
 	}
-	throw new Error("Expected S11tError");
+	throw new Error("Expected S11tnextError");
 }
 
 function errorDetails(action: () => unknown): { code: string; path: Array<string | number> } {
 	try {
 		action();
 	} catch (error) {
-		if (error instanceof S11tError) return { code: error.code, path: error.path };
+		if (error instanceof S11tnextError) return { code: error.code, path: error.path };
 		throw error;
 	}
-	throw new Error("Expected S11tError");
+	throw new Error("Expected S11tnextError");
 }
 
 describe("catalog", () => {
@@ -122,7 +122,7 @@ describe("catalog", () => {
 			compileCatalog([input], {
 				releaseProfile: "production",
 				provenance: {
-					configPath: "s11t.config.toml",
+					configPath: "s11tnext.config.toml",
 					sourceFiles: ["contexts/value.context.toml"],
 				},
 			}),
@@ -140,7 +140,7 @@ describe("catalog", () => {
 		]);
 		expect(catalog.describe("codingAgent.role-instructions")).toBe(descriptions[0]);
 		expect(Object.isFrozen(descriptions)).toBe(true);
-		expect(errorCode(() => catalog.describe("missing.context"))).toBe("S11T_CONTEXT_NOT_FOUND");
+		expect(errorCode(() => catalog.describe("missing.context"))).toBe("S11TNEXT_CONTEXT_NOT_FOUND");
 	});
 
 	it("keeps language switching at the top-level binding and snapshots language variables", () => {
@@ -176,7 +176,7 @@ describe("catalog", () => {
 			errorCode(() =>
 				catalog.bind({ instructionLocale: "ja-JP", fallbackLocales: ["ja-JP"] }),
 			),
-		).toBe("S11T_VALUE_INVALID");
+		).toBe("S11TNEXT_VALUE_INVALID");
 	});
 
 	it("rejects unsupported binding fields, null, arrays, and accessors without evaluating them", () => {
@@ -204,7 +204,7 @@ describe("catalog", () => {
 			accessor,
 			{ instructionLocale: "ja-JP", fallbackLocales: fallbackAccessor },
 		]) {
-			expect(errorCode(() => catalog.bind(binding as never))).toBe("S11T_VALUE_INVALID");
+			expect(errorCode(() => catalog.bind(binding as never))).toBe("S11TNEXT_VALUE_INVALID");
 		}
 		expect(reads).toBe(0);
 	});
@@ -212,14 +212,14 @@ describe("catalog", () => {
 	it("rejects artifact tampering", () => {
 		const input = artifact();
 		input.contexts["codingAgent.role-instructions"]!.key = "missing.key";
-		expect(errorCode(() => createCatalog(input))).toBe("S11T_ARTIFACT_INVALID");
+		expect(errorCode(() => createCatalog(input))).toBe("S11TNEXT_ARTIFACT_INVALID");
 	});
 
 	it("rejects placeholder mismatches in compiled artifacts before digest validation", () => {
 		const input = compileCatalog([definitionWithValue()], {
 			releaseProfile: "production",
 			provenance: {
-				configPath: "s11t.config.toml",
+				configPath: "s11tnext.config.toml",
 				sourceFiles: ["contexts/value.context.toml"],
 			},
 		});
@@ -227,8 +227,8 @@ describe("catalog", () => {
 			{ type: "literal", value: "Value" },
 		];
 		expect(() => createCatalog(input)).toThrowError(
-			expect.objectContaining<S11tError>({
-				code: "S11T_ARTIFACT_INVALID",
+			expect.objectContaining<S11tnextError>({
+				code: "S11TNEXT_ARTIFACT_INVALID",
 				message: "Translation placeholders must match the source locale",
 			}),
 		);
@@ -247,18 +247,18 @@ describe("catalog", () => {
 			compileCatalog([input], {
 				releaseProfile: "production",
 				provenance: {
-					configPath: "s11t.config.toml",
+					configPath: "s11tnext.config.toml",
 					sourceFiles: ["contexts/boundary.context.toml"],
 				},
 			}),
 		).bind({ instructionLocale: "ja-JP" })("codingAgent.role-instructions", {
-			value: "</S11T_DELIMITED_CONTEXT><script>&\u2028\u2029",
+			value: "</S11TNEXT_DELIMITED_CONTEXT><script>&\u2028\u2029",
 		});
 
 		expect(invocation.content.text).toContain(
-			'<S11T_DELIMITED_CONTEXT variable="value">',
+			'<S11TNEXT_DELIMITED_CONTEXT variable="value">',
 		);
-		expect(invocation.content.text).not.toContain("</S11T_DELIMITED_CONTEXT><script>");
+		expect(invocation.content.text).not.toContain("</S11TNEXT_DELIMITED_CONTEXT><script>");
 		expect(invocation.content.text).toContain("\\u003c");
 		expect(verifyRenderedHash(invocation.content.text, invocation.manifest.renderedHash)).toBe(
 			true,
@@ -333,7 +333,7 @@ describe("catalog", () => {
 		expect(Object.isFrozen(audit.renderTrace)).toBe(true);
 		expect(Object.isFrozen(audit.renderTrace[0])).toBe(true);
 		expect(() => request.p("codingAgent.role-instructions", {})).toThrowError(
-			expect.objectContaining<S11tError>({ code: "S11T_VALUE_INVALID" }),
+			expect.objectContaining<S11tnextError>({ code: "S11TNEXT_VALUE_INVALID" }),
 		);
 	});
 
@@ -345,11 +345,11 @@ describe("catalog", () => {
 		const secondInvocation = second.invoke("codingAgent.role-instructions", {});
 
 		expect(() => first.finalize(secondInvocation)).toThrowError(
-			expect.objectContaining<S11tError>({ code: "S11T_VALUE_INVALID" }),
+			expect.objectContaining<S11tnextError>({ code: "S11TNEXT_VALUE_INVALID" }),
 		);
 		const later = first.invoke("codingAgent.role-instructions", {});
 		expect(() => first.finalize(firstInvocation)).toThrowError(
-			expect.objectContaining<S11tError>({ code: "S11T_VALUE_INVALID" }),
+			expect.objectContaining<S11tnextError>({ code: "S11TNEXT_VALUE_INVALID" }),
 		);
 		expect(first.finalize(later).finalManifest).toBe(later.manifest);
 	});
@@ -400,14 +400,14 @@ describe("catalog", () => {
 					.bindText({ instructionLocale: "en-US" })
 					.p("codingAgent.role-instructions", {}),
 			),
-		).toBe("S11T_LOCALE_NOT_FOUND");
+		).toBe("S11TNEXT_LOCALE_NOT_FOUND");
 	});
 
 	it("preserves bind error codes and paths in text-only adapters", () => {
 		const valuesCatalog = createCatalog(
 			compileCatalog([definitionWithValue()], {
 				releaseProfile: "production",
-				provenance: { configPath: "s11t.config.toml", sourceFiles: ["contexts/a.context.toml"] },
+				provenance: { configPath: "s11tnext.config.toml", sourceFiles: ["contexts/a.context.toml"] },
 			}),
 		);
 		const invocation = valuesCatalog.bind({ instructionLocale: "ja-JP" }) as (
