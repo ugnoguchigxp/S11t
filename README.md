@@ -264,6 +264,26 @@ pnpm test:packages
 | `examples/node-basic` | 最小のNode.js統合例 |
 | `test-consumer` | 公開tarballと型定義のconsumerテスト |
 
+### 公開
+
+RuntimeとCLIは、ルートから1コマンドで既存のRelease workflowへdispatchできます。versionは環境変数ではなく、両パッケージのpackage.jsonから取得されます。
+
+```sh
+# 実行内容だけを確認（workflowは開始しません）
+pnpm release:publish:plan
+
+# 初回公開
+pnpm release:publish:bootstrap
+
+# canary公開
+pnpm release:publish:canary
+
+# stable公開
+pnpm release:publish
+```
+
+実行前に変更をコミットしてpushし、GitHub CLIでログインしてください。各コマンドはnpmへ直接publishせず、認証、事前検証、2パッケージの公開、provenance、署名、公開後検証を行う[Release workflow](./.github/workflows/release.yml)を開始します。詳しい前提条件は[npm公開手順](./docs/release/npm-publishing.md)を参照してください。
+
 ### ライセンス
 
 [Apache License 2.0](./LICENSE)。NOTICEについては[NOTICE](./NOTICE)を参照してください。
@@ -525,6 +545,26 @@ Main directories:
 | `docs` | Guides, specifications, and release procedures |
 | `examples/node-basic` | Minimal Node.js integration |
 | `test-consumer` | Consumer tests for published tarballs and types |
+
+### Publishing
+
+Runtime and CLI releases can be dispatched from the repository root with one command. The version comes from both package.json files, not an environment variable.
+
+```sh
+# Preview the dispatch without starting the workflow
+pnpm release:publish:plan
+
+# First publication
+pnpm release:publish:bootstrap
+
+# Canary publication
+pnpm release:publish:canary
+
+# Stable publication
+pnpm release:publish
+```
+
+Commit and push the release state and authenticate the GitHub CLI before running a publish command. These commands do not publish directly from the local checkout. They start the existing [Release workflow](./.github/workflows/release.yml), which owns authentication, preflight checks, both package publications, provenance, signatures, and post-publication verification. See the [npm publishing runbook](./docs/release/npm-publishing.md) for the required repository and npm setup.
 
 ### License
 

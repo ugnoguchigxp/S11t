@@ -1,8 +1,14 @@
 {
   "name": "s11tnext-cli",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "TOML authoring and build CLI for S11tnext",
-  "keywords": ["llm", "prompt", "system-context", "prompt-management", "cli"],
+  "keywords": [
+    "llm",
+    "prompt",
+    "system-context",
+    "prompt-management",
+    "cli"
+  ],
   "type": "module",
   "types": "./dist/index.d.ts",
   "license": "Apache-2.0",
@@ -15,7 +21,13 @@
   "bugs": {
     "url": "https://github.com/ugnoguchigxp/s11tnext/issues"
   },
-  "files": ["bin", "dist", "README.md", "LICENSE", "NOTICE"],
+  "files": [
+    "bin",
+    "dist",
+    "README.md",
+    "LICENSE",
+    "NOTICE"
+  ],
   "bin": {
     "s11tnext": "./bin/s11tnext.js"
   },

@@ -1,6 +1,6 @@
 {
   "name": "s11tnext-workspace",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "private": true,
   "type": "module",
   "license": "Apache-2.0",
@@ -38,6 +38,10 @@
     "test:consumer": "node scripts/test-tarball-consumer.mjs",
     "test:packages": "pnpm pack:all && pnpm test:package-contents && pnpm test:consumer",
     "release:dry-run": "node scripts/release-dry-run.mjs",
+    "release:publish": "node scripts/dispatch-release.mjs stable",
+    "release:publish:plan": "node scripts/dispatch-release.mjs stable --dry-run",
+    "release:publish:bootstrap": "node scripts/dispatch-release.mjs bootstrap",
+    "release:publish:canary": "node scripts/dispatch-release.mjs canary",
     "deploy:nightworkers-canary": "node scripts/deploy-nightworkers-canary.mjs",
     "verify": "pnpm check:versions && pnpm typecheck && pnpm test:coverage && pnpm build && pnpm test:type-fixtures && pnpm test:no-node-builtins && pnpm test:browser-bundle && pnpm exec s11tnext --help"
   },

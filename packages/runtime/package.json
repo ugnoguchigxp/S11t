@@ -1,8 +1,14 @@
 {
   "name": "s11tnext",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Filesystem-independent runtime and compiler contracts for S11tnext",
-  "keywords": ["llm", "prompt", "system-context", "prompt-management", "typescript"],
+  "keywords": [
+    "llm",
+    "prompt",
+    "system-context",
+    "prompt-management",
+    "typescript"
+  ],
   "type": "module",
   "types": "./dist/index.d.ts",
   "license": "Apache-2.0",
@@ -16,7 +22,12 @@
     "url": "https://github.com/ugnoguchigxp/s11tnext/issues"
   },
   "sideEffects": false,
-  "files": ["dist", "README.md", "LICENSE", "NOTICE"],
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE",
+    "NOTICE"
+  ],
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",

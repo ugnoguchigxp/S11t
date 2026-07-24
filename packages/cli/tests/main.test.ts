@@ -6,6 +6,13 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import { runCli, type CommandIo } from "../src/main.js";
 
+const runtimePackage = JSON.parse(
+	readFileSync(new URL("../../runtime/package.json", import.meta.url), "utf8"),
+) as { version?: unknown };
+if (typeof runtimePackage.version !== "string") {
+	throw new TypeError("Runtime package version is missing");
+}
+const expectedVersionOutput = `${runtimePackage.version}\n`;
 const temporaryDirectories: string[] = [];
 
 function temporaryFixture(name: string): string {
@@ -39,15 +46,15 @@ describe("CLI", () => {
 		const directory = temporaryFixture("valid/content-first");
 		expect(execute(["--version"], directory)).toEqual({
 			code: 0,
-			stdout: "0.0.0\n",
+			stdout: expectedVersionOutput,
 			stderr: "",
 		});
 		expect(execute(["version"], directory)).toEqual({
 			code: 0,
-			stdout: "0.0.0\n",
+			stdout: expectedVersionOutput,
 			stderr: "",
 		});
-		expect(execute(["-V"], directory).stdout).toBe("0.0.0\n");
+		expect(execute(["-V"], directory).stdout).toBe(expectedVersionOutput);
 		expect(execute(["version", "extra"], directory).code).toBe(2);
 		expect(execute(["help"], directory).stdout).toContain("SystemContext authoring");
 		expect(execute(["help", "unknown"], directory).code).toBe(2);
